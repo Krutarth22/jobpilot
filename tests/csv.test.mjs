@@ -38,7 +38,7 @@ test('toCsvRows: sequential ids, status new, found date', () => {
   assert.equal(rows.length, 2);
   assert.equal(rows[0].id, '7');
   assert.equal(rows[1].id, '8');
-  assert.ok(rows.every((r) => r.status === 'new' && r.score === '' && r.found === '2026-09-26'));
+  assert.ok(rows.every((r) => r.status === 'new' && r.fit === '' && r.found === '2026-09-26'));
   const job = jobFromFields(Object.values(rows[0]).map(String));
   assert.deepEqual(Object.keys(job), JOBS_HEADER);
 });
@@ -50,9 +50,9 @@ test('csv: file round-trip survives an odd number of embedded quotes', async () 
   const { writeJobs, readJobs } = await import('../scripts/lib/workspace.mjs');
   const root = mkdtempSync(join(tmpdir(), 'jobpilot-csv-'));
   const rows = [
-    { id: '1', company: 'Acme', title: 'Eng', url: 'https://a/1', location: '', found: '', score: '', status: 'new', notes: 'he said "hi' },
-    { id: '2', company: 'Beta', title: 'Eng', url: 'https://b/2', location: '', found: '', score: '', status: 'new', notes: 'multi\nline "quoted"' },
-    { id: '3', company: 'Gamma', title: 'Eng', url: 'https://c/3', location: '', found: '', score: '', status: 'new', notes: '' },
+    { id: '1', company: 'Acme', title: 'Eng', url: 'https://a/1', location: '', found: '', posted: '', salary: '', fit: '', rank: '', breakdown: '', status: 'new', outcome: '', notes: 'he said "hi' },
+    { id: '2', company: 'Beta', title: 'Eng', url: 'https://b/2', location: '', found: '', posted: '', salary: '', fit: '', rank: '', breakdown: '', status: 'new', outcome: '', notes: 'multi\nline "quoted"' },
+    { id: '3', company: 'Gamma', title: 'Eng', url: 'https://c/3', location: '', found: '', posted: '', salary: '', fit: '', rank: '', breakdown: '', status: 'new', outcome: '', notes: '' },
   ];
   writeJobs(root, rows);
   assert.deepEqual(readJobs(root), rows);

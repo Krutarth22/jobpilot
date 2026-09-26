@@ -98,10 +98,10 @@ async function main(argv) {
   if (cmd === 'list') {
     const { unscored, status } = parseListArgs(rest);
     if (status && !STATUSES.includes(status)) usage(`status must be one of: ${STATUSES.join(', ')}`);
-    const rows = jobs.filter((j) => (!status || j.status === status) && (!unscored || j.score === ''));
+    const rows = jobs.filter((j) => (!status || j.status === status) && (!unscored || j.fit === ''));
     console.log(`${rows.length} job(s)`);
     for (const j of rows) {
-      console.log(`#${j.id}\t${j.score || '-'}\t${j.status}\t[${j.company}] ${j.title}\t${j.location || ''}\t${j.url}`);
+      console.log(`#${j.id}\t${j.fit || '-'}\t${j.status}\t[${j.company}] ${j.title}\t${j.location || ''}\t${j.url}`);
     }
     return;
   }
@@ -121,7 +121,8 @@ async function main(argv) {
     const reason = rest.slice(2).join(' ').trim();
     if (!Number.isInteger(score) || score < 0 || score > 100) usage('score must be an integer 0-100');
     if (!reason) usage('score needs a short reason, e.g. score 3 87 "skills 9/10, senior match, EU remote"');
-    updateJobs(root, job.id, { score: String(score), notes: appendNote(job.notes, `score: ${reason}`) });
+    updateJobs(root, job.id, { fit: String(score), notes: appendNote(job.notes, `manual fit: ${reason}`) });
+    console.error('ℹ️  manual override — the auditable path is: AI checklist → scripts/score.mjs');
   } else if (cmd === 'status') {
     const status = rest[1];
     if (!STATUSES.includes(status)) usage(`status must be one of: ${STATUSES.join(', ')}`);

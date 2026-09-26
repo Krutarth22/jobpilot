@@ -69,7 +69,7 @@ export function toCsvRows(newJobs, startId, today) {
     url: job.url,
     location: job.location || '',
     found: today,
-    score: '',
+    fit: '',
     status: 'new',
     notes: '',
   }));

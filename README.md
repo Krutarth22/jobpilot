@@ -51,7 +51,7 @@ flowchart LR
 |---|---|---|
 | ⚙️ **setup** | Reads your resume and works out which roles, seniority and locations fit you, then asks you to confirm | Your profile, plus a list of companies to watch |
 | 🔍 **scan** | Checks the job boards of every company on your list | New jobs added to your tracker |
-| 📊 **match** | Scores each new job against your profile: skills, seniority, domain, location and pay | A ranked list with a one-line reason for each score |
+| 📊 **match** | An AI reads the job description and your profile and writes an **evidence-backed checklist** (every "met" verdict must quote your profile); a deterministic script turns that checklist into the score. Skills, seniority, domain, location and pay — with hard caps for deal-breakers | A fit score plus a per-signal breakdown (e.g. `S22/35 Sn20/25 D10/15 L15/15 C?/10`), stored in `evals/<id>.json` so you can audit exactly why a job scored what it did |
 | 🧐 **review** | Reads your profile the way that job's recruiter would | Your strengths, honest gaps, missing keywords, rewritten bullet points, and an optional tailored resume PDF |
 | 🤝 **contact** | Looks up the likely recruiter or hiring manager | Who they are, why they're the right person, and a LinkedIn note under 300 characters |
 | 📝 **apply** | Opens the real application form in a browser and fills it in from your profile | A filled form, a screenshot, and a list of the fields it couldn't answer. **It stops before Submit.** |
