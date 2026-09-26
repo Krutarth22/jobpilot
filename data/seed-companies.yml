@@ -37,7 +37,6 @@ companies:
   - { name: Gusto, provider: greenhouse, slug: gusto }
   - { name: Cloudflare, provider: greenhouse, slug: cloudflare }
   - { name: Dropbox, provider: greenhouse, slug: dropbox }
-  - { name: Nubank, provider: greenhouse, slug: nubank }
   - { name: Duolingo, provider: greenhouse, slug: duolingo }
   - { name: Lyft, provider: greenhouse, slug: lyft }
   - { name: PagerDuty, provider: greenhouse, slug: pagerduty }
@@ -59,11 +58,74 @@ companies:
   # ── Ashby ───────────────────────────────────────────────────────────
   - { name: Linear, provider: ashby, slug: linear }
   - { name: Ramp, provider: ashby, slug: ramp }
-  - { name: Deel, provider: ashby, slug: deel }
   - { name: Supabase, provider: ashby, slug: supabase }
   - { name: PostHog, provider: ashby, slug: posthog }
   - { name: Neon, provider: ashby, slug: neon }
   - { name: Sardine, provider: ashby, slug: sardine }
   - { name: Browserbase, provider: ashby, slug: browserbase }
-  - { name: Mercury, provider: ashby, slug: mercury }
   - { name: Ashby, provider: ashby, slug: ashby }
+  - { name: OpenAI, provider: ashby, slug: openai }
+  - { name: Anthropic, provider: greenhouse, slug: anthropic }
+  - { name: Discord, provider: greenhouse, slug: discord }
+  - { name: Roblox, provider: greenhouse, slug: roblox }
+  - { name: Affirm, provider: greenhouse, slug: affirm }
+  - { name: Chime, provider: greenhouse, slug: chime }
+  - { name: Asana, provider: greenhouse, slug: asana }
+  - { name: Box, provider: greenhouse, slug: boxinc }
+  - { name: Sentry, provider: ashby, slug: sentry }
+  - { name: Samsara, provider: greenhouse, slug: samsara }
+  - { name: Klaviyo, provider: greenhouse, slug: klaviyo }
+  - { name: Toast, provider: greenhouse, slug: toast }
+  - { name: Thumbtack, provider: ashby, slug: thumbtack }
+  - { name: Block, provider: greenhouse, slug: block }
+  - { name: Zapier, provider: ashby, slug: zapier }
+  - { name: Substack, provider: ashby, slug: substack }
+  - { name: Branch, provider: greenhouse, slug: branch }
+  - { name: Notion, provider: ashby, slug: notion }
+  - { name: Perplexity, provider: ashby, slug: perplexity }
+  - { name: Replit, provider: ashby, slug: replit }
+  - { name: Vanta, provider: ashby, slug: vanta }
+  - { name: Together AI, provider: greenhouse, slug: togetherai }
+  - { name: Modal, provider: ashby, slug: modal }
+  - { name: LangChain, provider: ashby, slug: langchain }
+  - { name: Suno, provider: ashby, slug: suno }
+  - { name: ElevenLabs, provider: ashby, slug: elevenlabs }
+  - { name: Moonpay, provider: lever, slug: moonpay }
+  - { name: DeepL, provider: ashby, slug: deepl }
+  - { name: Monzo, provider: greenhouse, slug: monzo }
+  - { name: Mollie, provider: ashby, slug: mollie }
+  - { name: Adyen, provider: greenhouse, slug: adyen }
+  - { name: Miro, provider: ashby, slug: miro }
+  - { name: Pleo, provider: ashby, slug: pleo }
+  - { name: GetYourGuide, provider: greenhouse, slug: getyourguide }
+  - { name: Celonis, provider: greenhouse, slug: celonis }
+  - { name: Netlify, provider: greenhouse, slug: netlify }
+  - { name: Fivetran, provider: greenhouse, slug: fivetran }
+  - { name: Snowflake, provider: ashby, slug: snowflake }
+  - { name: Docker, provider: ashby, slug: docker }
+  - { name: Neon, provider: lever, slug: neon }
+  - { name: PlanetScale, provider: greenhouse, slug: planetscale }
+  - { name: Cockroach Labs, provider: greenhouse, slug: cockroachlabs }
+  - { name: Yugabyte, provider: greenhouse, slug: yugabyte }
+  - { name: MongoDB, provider: greenhouse, slug: mongodb }
+  - { name: Confluent, provider: ashby, slug: confluent }
+  - { name: Datadog, provider: greenhouse, slug: datadog }
+  - { name: Honeycomb, provider: greenhouse, slug: honeycomb }
+  - { name: LaunchDarkly, provider: greenhouse, slug: launchdarkly }
+  - { name: Amplitude, provider: greenhouse, slug: amplitude }
+  - { name: Mixpanel, provider: greenhouse, slug: mixpanel }
+  - { name: Salesloft, provider: greenhouse, slug: salesloft }
+  - { name: Intercom, provider: greenhouse, slug: intercom }
+  - { name: Mural, provider: ashby, slug: mural }
+  - { name: Webflow, provider: greenhouse, slug: webflow }
+  - { name: Calendly, provider: greenhouse, slug: calendly }
+  - { name: Typeform, provider: greenhouse, slug: typeform }
+  - { name: Airtable, provider: greenhouse, slug: airtable }
+  - { name: Wise, provider: greenhouse, slug: wise }
+  - { name: N26, provider: greenhouse, slug: n26 }
+  - { name: Sumup, provider: greenhouse, slug: sumup }
+  - { name: Scale AI, provider: greenhouse, slug: scaleai }
+  - { name: Bumble, provider: ashby, slug: bumbleinc }
+  - { name: Patreon, provider: ashby, slug: patreon }
+  - { name: Watershed, provider: greenhouse, slug: watershed }
+  - { name: Stability AI, provider: greenhouse, slug: stabilityai }

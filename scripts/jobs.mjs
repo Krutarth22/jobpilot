@@ -31,7 +31,7 @@ const PROVIDERS = { greenhouse, lever, ashby };
 
 const usage = (msg) => {
   if (msg) console.error(`⚠️  ${msg}`);
-  console.error('Usage: jobs.mjs <list|show|get|score|status|note|sweep|feedback|outcome|stats> ...');
+  console.error('Usage: jobs.mjs <list|show|get|score|status|note|sweep|feedback|outcome|stats|eval> ...');
   process.exit(1);
 };
 
@@ -209,6 +209,17 @@ async function main(argv) {
     if (!OUTCOMES.includes(outcome)) usage(`outcome must be one of: ${OUTCOMES.join(', ')}`);
     updateJobs(root, job.id, { outcome });
     if (outcome === 'interview' && job.status === 'new') updateJobs(root, job.id, { status: 'applied' });
+  } else if (cmd === 'eval') {
+    // E1: store non-score data (e.g. contact notes) in evals/<id>.json.
+    //   jobs.mjs eval <id> contact '{"name": "...", "confidence": "..."}'
+    const key = rest[1];
+    const raw = rest.slice(2).join(' ').trim();
+    if (!key || !raw) usage('eval needs a key and JSON, e.g. eval 12 contact \'{"name":"Jane"}\'');
+    let value;
+    try { value = JSON.parse(raw); } catch { usage('eval value must be valid JSON'); }
+    const ev = readEval(root, job.id) || { id: job.id, company: job.company, title: job.title, url: job.url };
+    ev[key] = value;
+    writeEval(root, job.id, ev);
   } else {
     usage(`unknown command "${cmd}"`);
   }

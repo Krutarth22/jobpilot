@@ -23,10 +23,14 @@ Draft-only: nothing is ever sent, logged into LinkedIn, or auto-submitted.
    - **recruiter/talent partner** for the company's engineering org (often fastest path)
    - **hiring manager** — who owns this function (infer from title/team page/LinkedIn)
    - **peer** on the team (a future colleague; often the most honest signal)
-   Note *why* you think this person is the right contact, and the confidence (page evidence vs. inference). Mark anything uncertain — the user should know before messaging a stranger.
+   Note *why* you think this person is the right contact, with an explicit **confidence level**: `confirmed` (found on the company's own site/board), `inferred` (LinkedIn title/team match), or `guess`. Mark anything uncertain — the user should know before messaging a stranger.
 3. Read `profile.md` and draft **one message ≤300 characters**:
    - one concrete, profile-backed hook (a real skill or result relevant to *this* posting)
    - one specific question or ask about the role
    - no generic flattery ("I'm passionate about…"), no emoji walls, no fabricated common ground
    - state character count explicitly so the user can trust the 300 limit
 4. Offer (don't execute): alternatives — a second draft in a different tone, or a different contact. The user sends it themselves.
+5. **Save the chosen contact** so a follow-up draft days later knows who was messaged:
+   ```sh
+   node "<pluginRoot>/scripts/jobs.mjs" eval <id> contact '{"name": "...", "title": "...", "kind": "recruiter|hiring-manager|peer", "confidence": "confirmed|inferred|guess", "evidence": "where you found them", "drafted_at": "<today>"}'
+   ```

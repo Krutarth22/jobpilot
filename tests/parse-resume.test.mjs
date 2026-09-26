@@ -91,7 +91,7 @@ function buildDocx(paragraphText) {
 test('parse-resume: real PDF fixture extracts text', async () => {
   const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'sample-resume.pdf');
   const text = await extractText(fixture);
-  assert.match(text, /Krutarth Majithia/);
+  assert.match(text, /Jordan Rivera/);
   assert.match(text, /Kubernetes/);
 });
 
