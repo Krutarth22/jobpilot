@@ -3,13 +3,15 @@
 //
 //   node liveness.mjs <posting-url>     → prints {"verdict": "active|expired|uncertain", "signal": "..."}
 //
-// Signals adapted from career-ops liveness-core.mjs (MIT). Expired signals WIN
+// Greenhouse, Lever and Ashby postings are checked against the ATS's own API
+// first. Other URLs fall back to page-text signals adapted from career-ops
+// liveness-core.mjs (MIT). Expired signals WIN
 // over generic Apply text: many ATSs keep a generic Apply button on closed
 // postings. Used by `review` and `apply` to warn before wasting effort on a
 // dead posting. Heuristic only — a verdict of `uncertain` means check the page.
 
-import { resolve } from 'node:path';
-import { fetchText } from './lib/_http.mjs';
+import { fetchJson, fetchPage } from './lib/_http.mjs';
+import { normalizeUrl } from './lib/workspace.mjs';
 import { isMainModule } from './lib/main.mjs';
 
 function normalizeForMatch(text = '') {
@@ -95,10 +97,70 @@ export function classifyLiveness({ status = 0, bodyText = '' } = {}) {
   return { verdict: 'uncertain', signal: hasApply ? 'apply control but thin content' : 'content but no apply control' };
 }
 
-export async function checkUrl(url) {
+/** Visible text only: JS-rendered boards (Ashby, Lever) ship bundles full of
+ * words like "apply" that would otherwise read as a live posting. */
+export function visibleText(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ');
+}
+
+// Greenhouse redirects a closed job to its board with ?error=true.
+export function isClosedRedirect(finalUrl) {
   try {
-    const text = await fetchText(url, { timeoutMs: 20_000 });
-    return classifyLiveness({ status: 200, bodyText: text });
+    return new URL(finalUrl).searchParams.get('error') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The ATS's own API is the most reliable signal for the three boards jobpilot
+ * scans. Returns null for any other URL (or when the API can't decide).
+ */
+export async function checkViaApi(url, { fetchJson: fetchJsonFn = fetchJson } = {}) {
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  const [slug, id] = u.pathname.split('/').filter(Boolean);
+  const byStatus = async (apiUrl) => {
+    try {
+      await fetchJsonFn(apiUrl, { redirect: 'error' });
+      return { verdict: 'active', signal: `listed in ${u.hostname} API` };
+    } catch (err) {
+      if (err?.status === 404) return { verdict: 'expired', signal: `404 from ${u.hostname} API` };
+      return null;
+    }
+  };
+  if (u.hostname === 'jobs.lever.co' && slug && id) {
+    return byStatus(`https://api.lever.co/v0/postings/${encodeURIComponent(slug)}/${encodeURIComponent(id)}`);
+  }
+  if (/(^|\.)greenhouse\.io$/.test(u.hostname)) {
+    const ghId = u.searchParams.get('gh_jid') || u.pathname.match(/\/jobs\/(\d+)/)?.[1];
+    if (slug && ghId) return byStatus(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(slug)}/jobs/${ghId}`);
+  }
+  if (u.hostname === 'jobs.ashbyhq.com' && slug && id) {
+    try {
+      const json = await fetchJsonFn(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(slug)}`, { timeoutMs: 30_000, redirect: 'error' });
+      const listed = (json?.jobs || []).some((j) => normalizeUrl(j.jobUrl || '') === normalizeUrl(url));
+      return listed
+        ? { verdict: 'active', signal: 'listed in Ashby board API' }
+        : { verdict: 'expired', signal: 'no longer in Ashby board API' };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function checkUrl(url) {
+  const api = await checkViaApi(url);
+  if (api) return api;
+  try {
+    const page = await fetchPage(url, { timeoutMs: 20_000 });
+    if (isClosedRedirect(page.url)) return { verdict: 'expired', signal: `redirected to ${page.url}` };
+    return classifyLiveness({ status: 200, bodyText: visibleText(page.text) });
   } catch (err) {
     const status = err?.status;
     if (status === 404 || status === 410) return { verdict: 'expired', signal: `HTTP ${status}` };

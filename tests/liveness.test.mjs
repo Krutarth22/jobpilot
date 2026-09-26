@@ -44,3 +44,31 @@ test('uncertain: thin page with no apply control', () => {
 test('uncertain: other 4xx/5xx', () => {
   assert.equal(classifyLiveness({ status: 500, bodyText: 'error' }).verdict, 'uncertain');
 });
+
+test('visibleText drops script bundles so "apply" in JS is not a live signal', async () => {
+  const { visibleText } = await import('../scripts/liveness.mjs');
+  const text = visibleText('<div id="root"></div><script>function apply(){}</script>');
+  assert.equal(classifyLiveness({ status: 200, bodyText: text }).verdict, 'uncertain');
+});
+
+test('greenhouse ?error=true redirect reads as closed', async () => {
+  const { isClosedRedirect } = await import('../scripts/liveness.mjs');
+  assert.equal(isClosedRedirect('https://job-boards.greenhouse.io/figma?error=true'), true);
+  assert.equal(isClosedRedirect('https://job-boards.greenhouse.io/figma/jobs/123'), false);
+});
+
+test('checkViaApi: per-ATS API verdicts, null for unknown hosts', async () => {
+  const { checkViaApi } = await import('../scripts/liveness.mjs');
+  const notFound = async () => { const e = new Error('HTTP 404'); e.status = 404; throw e; };
+  const ok = async () => ({});
+  assert.equal((await checkViaApi('https://jobs.lever.co/acme/abc-123', { fetchJson: ok })).verdict, 'active');
+  assert.equal((await checkViaApi('https://jobs.lever.co/acme/abc-123', { fetchJson: notFound })).verdict, 'expired');
+  assert.equal((await checkViaApi('https://job-boards.greenhouse.io/figma/jobs/555', { fetchJson: notFound })).verdict, 'expired');
+  const board = async () => ({ jobs: [{ jobUrl: 'https://jobs.ashbyhq.com/acme/uuid-1' }] });
+  assert.equal((await checkViaApi('https://jobs.ashbyhq.com/acme/uuid-1', { fetchJson: board })).verdict, 'active');
+  assert.equal((await checkViaApi('https://jobs.ashbyhq.com/acme/uuid-2', { fetchJson: board })).verdict, 'expired');
+  assert.equal(await checkViaApi('https://example.com/careers/1', { fetchJson: ok }), null);
+  // A 5xx from the API can't decide — fall through to the page check.
+  const boom = async () => { const e = new Error('HTTP 503'); e.status = 503; throw e; };
+  assert.equal(await checkViaApi('https://jobs.lever.co/acme/abc-123', { fetchJson: boom }), null);
+});

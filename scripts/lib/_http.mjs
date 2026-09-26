@@ -30,6 +30,9 @@ async function fetchWithTimeout(url, { timeoutMs = DEFAULT_TIMEOUT_MS, headers =
 
 export const fetchJson = (url, opts = {}) => fetchWithTimeout(url, opts, (res) => res.json());
 export const fetchText = (url, opts = {}) => fetchWithTimeout(url, opts, (res) => res.text());
+/** Like fetchText, but also returns the post-redirect URL. */
+export const fetchPage = (url, opts = {}) =>
+  fetchWithTimeout(url, opts, async (res) => ({ url: res.url, text: await res.text() }));
 
 export function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));

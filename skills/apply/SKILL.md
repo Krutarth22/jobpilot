@@ -8,6 +8,8 @@ description: Open a job's application form, fill it from profile.md, upload the 
 Fill a real application form and stop for human review. The assistant never
 clicks Submit/Send/Apply — the user does.
 
+`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; in Codex/Cursor it is `pluginRoot` from `~/.jobpilot.json` (details in the `jobpilot` skill).
+
 ## Non-negotiable rules (apply to every jobpilot mode — this mode exists to enforce #3)
 
 1. **No fabrication.** Form answers come from `profile.md` or the user's words in this conversation. A field the profile can't answer gets **flagged, not guessed** — leave it for the user.

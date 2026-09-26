@@ -8,6 +8,7 @@
 // (3) compensation parsing (annualized) for the match rubric's comp signal.
 
 import { fetchJson, sleep, toEpochMs } from '../lib/_http.mjs';
+import { normalizeUrl } from '../lib/workspace.mjs';
 
 const TIMEOUT_MS = 30_000;
 const RETRIES = 2;
@@ -97,6 +98,6 @@ export async function fetchBoard({ name, slug }, opts = {}) {
 export async function fetchDescription({ slug }, _jobId, { fetchJson: fetchJsonFn = fetchJson, url = '' } = {}) {
   const json = await fetchBoardJson(slug, { fetchJson: fetchJsonFn });
   const jobs = Array.isArray(json?.jobs) ? json.jobs : [];
-  const match = url ? jobs.find((j) => (j.jobUrl || '').split('?')[0] === url.split('?')[0]) : null;
+  const match = url ? jobs.find((j) => normalizeUrl(j.jobUrl || '') === normalizeUrl(url)) : null;
   return match ? match.descriptionPlain || '' : '';
 }

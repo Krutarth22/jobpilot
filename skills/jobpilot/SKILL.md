@@ -21,7 +21,9 @@ A small job-search pipeline. Five modes plus one-time setup:
 Every mode shells out to deterministic scripts. Resolve the plugin root once:
 
 - **Claude Code:** `$CLAUDE_PLUGIN_ROOT` (use it literally: `node "$CLAUDE_PLUGIN_ROOT/scripts/scan.mjs"`).
-- **Codex / Cursor / manual clone:** the plugin root is recorded as `pluginRoot` in `~/.jobpilot.json` (setup writes it). Run `node "$(node -p 'require(JSON.parse(require("fs").readFileSync(require("os").homedir()+"/.jobpilot.json","utf8")).pluginRoot)')/scripts/..."` or read the value once and use the absolute path.
+- **Codex / Cursor / manual clone:** the plugin root is recorded as `pluginRoot` in `~/.jobpilot.json` (setup writes it). Read it once and use the absolute path:
+  `node -p 'JSON.parse(require("fs").readFileSync(require("os").homedir()+"/.jobpilot.json","utf8")).pluginRoot'`
+- If a script fails with `ERR_MODULE_NOT_FOUND` (deps are wiped when a plugin updates), run `npm i --prefix "<pluginRoot>"` once and retry.
 
 The workspace (user data) is `JOBPILOT_HOME`, the `root` in `~/.jobpilot.json`, or `~/jobpilot`. Scripts handle this — never point them at the plugin folder.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // jobpilot scan — zero-token posting scanner over Greenhouse/Lever/Ashby.
 //
-//   node scan.mjs [--root DIR] [--limit N]
+//   node scan.mjs [--root=DIR] [--limit N]
 //
 // Reads companies.yml from the workspace, fetches every board's public API,
 // filters by title and location, dedups against jobs.csv (by normalized URL),

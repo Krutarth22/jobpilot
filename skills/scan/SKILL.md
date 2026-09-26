@@ -8,6 +8,8 @@ description: Fetch new job postings from the user's Greenhouse/Lever/Ashby board
 Fetch new postings from every board in `companies.yml` into `jobs.csv`.
 Purely deterministic — no LLM calls, zero tokens.
 
+`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; in Codex/Cursor it is `pluginRoot` from `~/.jobpilot.json` (details in the `jobpilot` skill).
+
 ## Non-negotiable rules (apply to every jobpilot mode)
 
 1. **No fabrication.** Claims trace to `profile.md` or the user's words only.
@@ -16,7 +18,7 @@ Purely deterministic — no LLM calls, zero tokens.
 
 ## Steps
 
-1. Resolve the plugin root (router skill). Then run:
+1. Run:
    ```sh
    node "<pluginRoot>/scripts/scan.mjs"
    ```

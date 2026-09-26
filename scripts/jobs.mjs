@@ -7,10 +7,9 @@
 //   jobs.mjs get <id> --jd        fetch + print the full job description
 //   jobs.mjs score <id> <0-100> "<reason>"
 //   jobs.mjs status <id> <new|applied|closed>
-//   jobs.mjs note <id> "<text>"
+//   jobs.mjs note <id> "<text>"      appends to notes (never overwrites)
 
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import yaml from 'js-yaml';
 import {
   workspaceRoot, readJobs, updateJobs, findJob, STATUSES,
@@ -62,6 +61,9 @@ export async function fetchDescription(root, job) {
   }
   const provider = PROVIDERS[entry.provider];
   const jobId = entry.provider === 'greenhouse' ? greenhouse.jobIdFromUrl(job.url) : null;
+  if (entry.provider === 'greenhouse' && !jobId) {
+    throw new Error(`can't find a Greenhouse job id in ${job.url} — fetch the posting page instead`);
+  }
   const text = await provider.fetchDescription(entry, jobId, { url: job.url });
   return entry.provider === 'greenhouse' ? htmlToText(text) : text;
 }
@@ -73,12 +75,19 @@ function printJob(job) {
 
 function parseListArgs(args) {
   const filters = {};
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
     if (arg === '--unscored') filters.unscored = true;
     else if (arg.startsWith('--status=')) filters.status = arg.slice(9);
+    else if (arg === '--status') filters.status = args[++i];
     else usage(`unknown list argument "${arg}"`);
   }
   return filters;
+}
+
+/** Notes accumulate: a later note must never wipe the score reason. */
+export function appendNote(existing, text) {
+  return existing ? `${existing} | ${text}` : text;
 }
 
 async function main(argv) {
@@ -112,7 +121,7 @@ async function main(argv) {
     const reason = rest.slice(2).join(' ').trim();
     if (!Number.isInteger(score) || score < 0 || score > 100) usage('score must be an integer 0-100');
     if (!reason) usage('score needs a short reason, e.g. score 3 87 "skills 9/10, senior match, EU remote"');
-    updateJobs(root, job.id, { score: String(score), notes: reason });
+    updateJobs(root, job.id, { score: String(score), notes: appendNote(job.notes, `score: ${reason}`) });
   } else if (cmd === 'status') {
     const status = rest[1];
     if (!STATUSES.includes(status)) usage(`status must be one of: ${STATUSES.join(', ')}`);
@@ -120,7 +129,7 @@ async function main(argv) {
   } else if (cmd === 'note') {
     const note = rest.slice(1).join(' ').trim();
     if (!note) usage('note needs text');
-    updateJobs(root, job.id, { notes: note });
+    updateJobs(root, job.id, { notes: appendNote(job.notes, note) });
   } else {
     usage(`unknown command "${cmd}"`);
   }

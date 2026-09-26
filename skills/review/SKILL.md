@@ -8,6 +8,8 @@ description: Show how a recruiter for a specific job would see the user's profil
 For one job: a recruiter's-eye critique of the user's profile, rewritten
 bullets, and (optionally) a tailored resume PDF in `out/`.
 
+`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; in Codex/Cursor it is `pluginRoot` from `~/.jobpilot.json` (details in the `jobpilot` skill).
+
 ## Non-negotiable rules (apply to every jobpilot mode)
 
 1. **No fabrication.** Bullets may be **reordered and reframed** from `profile.md` — never invented. No new metrics, employers, dates, or skills. If a keyword the JD wants isn't backed by the profile, it goes in the GAPS list, not into the resume.

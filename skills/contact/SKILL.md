@@ -8,6 +8,8 @@ description: Find the likely hiring manager or recruiter for a job and draft a L
 Identify the right human for one job and draft a short outreach note.
 Draft-only: nothing is ever sent, logged into LinkedIn, or auto-submitted.
 
+`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; in Codex/Cursor it is `pluginRoot` from `~/.jobpilot.json` (details in the `jobpilot` skill).
+
 ## Non-negotiable rules (apply to every jobpilot mode)
 
 1. **No fabrication.** The draft may cite only facts from `profile.md` and observable facts about the person/company. Never invent shared background.

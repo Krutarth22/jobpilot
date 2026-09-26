@@ -42,3 +42,24 @@ test('toCsvRows: sequential ids, status new, found date', () => {
   const job = jobFromFields(Object.values(rows[0]).map(String));
   assert.deepEqual(Object.keys(job), JOBS_HEADER);
 });
+
+test('csv: file round-trip survives an odd number of embedded quotes', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { writeJobs, readJobs } = await import('../scripts/lib/workspace.mjs');
+  const root = mkdtempSync(join(tmpdir(), 'jobpilot-csv-'));
+  const rows = [
+    { id: '1', company: 'Acme', title: 'Eng', url: 'https://a/1', location: '', found: '', score: '', status: 'new', notes: 'he said "hi' },
+    { id: '2', company: 'Beta', title: 'Eng', url: 'https://b/2', location: '', found: '', score: '', status: 'new', notes: 'multi\nline "quoted"' },
+    { id: '3', company: 'Gamma', title: 'Eng', url: 'https://c/3', location: '', found: '', score: '', status: 'new', notes: '' },
+  ];
+  writeJobs(root, rows);
+  assert.deepEqual(readJobs(root), rows);
+});
+
+test('jobs: notes append instead of overwriting', async () => {
+  const { appendNote } = await import('../scripts/jobs.mjs');
+  assert.equal(appendNote('', 'first'), 'first');
+  assert.equal(appendNote('score: skills match', 'applied'), 'score: skills match | applied');
+});

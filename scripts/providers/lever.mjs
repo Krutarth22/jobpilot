@@ -4,6 +4,7 @@
 // description fetches are a board list + match on hostedUrl.
 
 import { fetchJson, toEpochMs } from '../lib/_http.mjs';
+import { normalizeUrl } from '../lib/workspace.mjs';
 
 const ALLOWED_HOSTS = new Set(['api.lever.co', 'api.eu.lever.co']);
 
@@ -31,7 +32,7 @@ export async function fetchBoard({ name, slug }, { fetchJson: fetchJsonFn = fetc
 export async function fetchDescription({ slug }, _jobId, { fetchJson: fetchJsonFn = fetchJson, url = '' } = {}) {
   const postings = await fetchJsonFn(apiUrlFor(slug), { redirect: 'error' });
   const match = Array.isArray(postings) && url
-    ? postings.find((j) => (j.hostedUrl || '').split('?')[0] === url.split('?')[0])
+    ? postings.find((j) => normalizeUrl(j.hostedUrl || '') === normalizeUrl(url))
     : null;
   return match ? match.descriptionPlain || '' : '';
 }

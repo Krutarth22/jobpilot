@@ -117,9 +117,10 @@ export function readCsv(file) {
     } else {
       current = line;
     }
-    // Count unescaped quotes to know if a quoted field is still open.
-    const unescaped = (current.match(/(^|[^"])""|"/g) || []).length;
-    inQuotes = unescaped % 2 === 1;
+    // Escaped quotes ("") come in pairs, so the raw quote count's parity says
+    // whether a quoted field is still open.
+    const quotes = (current.match(/"/g) || []).length;
+    inQuotes = quotes % 2 === 1;
     if (!inQuotes) {
       if (current.trim() !== '') records.push(parseCsvLine(current));
       current = '';

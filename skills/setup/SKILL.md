@@ -8,6 +8,8 @@ description: One-time jobpilot setup — create the workspace from a single resu
 Turn one resume file into a working workspace. Everything the user later
 generates traces back to `profile.md` — build it carefully.
 
+`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; in Codex/Cursor it is `pluginRoot` from `~/.jobpilot.json` (details in the `jobpilot` skill).
+
 ## Non-negotiable rules (apply to every jobpilot mode)
 
 1. **No fabrication.** Every claim must trace to the resume or the user's words in this conversation. Missing info → ask. Never invent.
