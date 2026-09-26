@@ -2,19 +2,23 @@
 // jobpilot jobs — the only tracker is jobs.csv. Read, fetch descriptions,
 // score, and set status from here.
 //
-//   jobs.mjs list [--status new|applied|closed] [--unscored]
+//   jobs.mjs list [--status new|applied|closed] [--unscored] [--ranked]
 //   jobs.mjs show <id>
 //   jobs.mjs get <id> --jd        fetch + print the full job description
 //   jobs.mjs score <id> <0-100> "<reason>"
 //   jobs.mjs status <id> <new|applied|closed>
 //   jobs.mjs note <id> "<text>"      appends to notes (never overwrites)
+//   jobs.mjs sweep [--limit=N]       liveness-check new/applied rows, close expired
 
 import { readFile } from 'node:fs/promises';
 import yaml from 'js-yaml';
 import {
-  workspaceRoot, readJobs, updateJobs, findJob, STATUSES,
+  workspaceRoot, readJobs, writeJobs, updateJobs, findJob, STATUSES,
 } from './lib/workspace.mjs';
 import { isMainModule } from './lib/main.mjs';
+import { loadProfile } from './lib/profile.mjs';
+import { rankAll } from './lib/rank.mjs';
+import { sweepClosed, SWEEP_DEFAULT_LIMIT } from './lib/sweep.mjs';
 import * as greenhouse from './providers/greenhouse.mjs';
 import * as lever from './providers/lever.mjs';
 import * as ashby from './providers/ashby.mjs';
@@ -78,6 +82,7 @@ function parseListArgs(args) {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--unscored') filters.unscored = true;
+    else if (arg === '--ranked') filters.ranked = true;
     else if (arg.startsWith('--status=')) filters.status = arg.slice(9);
     else if (arg === '--status') filters.status = args[++i];
     else usage(`unknown list argument "${arg}"`);
@@ -96,12 +101,32 @@ async function main(argv) {
   const jobs = readJobs(root);
 
   if (cmd === 'list') {
-    const { unscored, status } = parseListArgs(rest);
+    const { unscored, status, ranked } = parseListArgs(rest);
     if (status && !STATUSES.includes(status)) usage(`status must be one of: ${STATUSES.join(', ')}`);
+    if (ranked) {
+      // rank = fit × freshness × comp factor (lib/rank.mjs); persists ranks.
+      const { profile } = loadProfile(root);
+      const rankById = new Map(rankAll(jobs, profile).map(({ job, rank }) => [job.id, String(rank)]));
+      for (const j of jobs) j.rank = j.fit === '' ? '' : (rankById.get(j.id) ?? ''); // unscored → no rank yet
+      writeJobs(root, jobs);
+    }
     const rows = jobs.filter((j) => (!status || j.status === status) && (!unscored || j.fit === ''));
+    if (ranked) rows.sort((a, b) => (Number(b.rank) || 0) - (Number(a.rank) || 0));
     console.log(`${rows.length} job(s)`);
     for (const j of rows) {
-      console.log(`#${j.id}\t${j.fit || '-'}\t${j.status}\t[${j.company}] ${j.title}\t${j.location || ''}\t${j.url}`);
+      const head = ranked ? `#${j.id}\trank ${j.rank || '-'}\tfit ${j.fit || '-'}\t${j.status}` : `#${j.id}\t${j.fit || '-'}\t${j.status}`;
+      console.log(`${head}\t[${j.company}] ${j.title}\t${j.location || ''}\t${j.posted || ''}\t${j.salary || ''}\t${j.url}`);
+    }
+    return;
+  }
+
+  if (cmd === 'sweep') {
+    const limitArg = rest.find((a) => a.startsWith('--limit='));
+    const limit = limitArg ? Number(limitArg.slice(8)) : SWEEP_DEFAULT_LIMIT;
+    const result = await sweepClosed(root, { limit });
+    console.log(JSON.stringify(result, null, 2));
+    if (result.closed > 0) {
+      for (const d of result.details) console.log(`  🔒 #${d.id} [${d.company}] ${d.title} — ${d.signal}`);
     }
     return;
   }

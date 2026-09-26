@@ -50,7 +50,7 @@ flowchart LR
 | Step | What happens | What you get |
 |---|---|---|
 | ⚙️ **setup** | Reads your resume and works out which roles, seniority and locations fit you, then asks you to confirm | Your profile, plus a list of companies to watch |
-| 🔍 **scan** | Checks the job boards of every company on your list | New jobs added to your tracker |
+| 🔍 **scan** | Checks the job boards of every company on your list. Keeps each posting's **date and salary**, flags likely **reposts**, auto-sweeps **closed** postings, and reports **near-miss** titles your filters may be too narrow for | New jobs added to your tracker (with posting age and pay), plus filter suggestions |
 | 📊 **match** | An AI reads the job description and your profile and writes an **evidence-backed checklist** (every "met" verdict must quote your profile); a deterministic script turns that checklist into the score. Skills, seniority, domain, location and pay — with hard caps for deal-breakers | A fit score plus a per-signal breakdown (e.g. `S22/35 Sn20/25 D10/15 L15/15 C?/10`), stored in `evals/<id>.json` so you can audit exactly why a job scored what it did |
 | 🧐 **review** | Reads your profile the way that job's recruiter would | Your strengths, honest gaps, missing keywords, rewritten bullet points, and an optional tailored resume PDF |
 | 🤝 **contact** | Looks up the likely recruiter or hiring manager | Who they are, why they're the right person, and a LinkedIn note under 300 characters |
@@ -194,6 +194,8 @@ No, and that's on purpose. Mass-applying gets ignored by recruiters and can get 
 <summary><b>The scan found nothing. What now?</b></summary>
 
 Your title filter is probably too narrow. Open `companies.yml` and add more wordings under `title_filter.positive`. Use `+` to require words in any order: `manager + engineering` matches both *"Engineering Manager"* and *"Manager, Software Engineering"*. Or ask jobpilot: *"broaden my scan filters"*.
+
+Every scan also prints **near misses** — titles that passed your location filter, failed your title filter, and still share keywords with your target titles — with the exact keywords to add, so you don't have to guess.
 </details>
 
 ---
