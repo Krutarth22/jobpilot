@@ -8,7 +8,7 @@ description: One-time jobpilot setup — create the workspace from a single resu
 Turn one resume file into a working workspace. Everything the user later
 generates traces back to `profile.md` — build it carefully.
 
-`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; in Codex/Cursor it is `pluginRoot` from `~/.jobpilot.json` (details in the `jobpilot` skill).
+`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; anywhere else it is the folder two levels above this SKILL.md (the one containing `scripts/`).
 
 ## Non-negotiable rules (apply to every jobpilot mode)
 
@@ -36,6 +36,7 @@ generates traces back to `profile.md` — build it carefully.
    - **Facts:** name, contact, location, work authorization (if on the resume), experience (company, title, dates, bullets with their original metrics), skills, education, certifications.
    - **Targets — mark every inference explicitly.** Infer 5–10 target titles, a seniority band, and a preferred location/remote policy from the resume's trajectory, and write them under a `<!-- inferred: confirm with user -->` heading. Facts and inferences must be visually separate in the file.
    - **Deal-breakers:** empty section — ask the user (min salary, exclusions, visa constraints). Leave what they don't answer blank rather than guessing.
+   - **Scan filters:** rewrite `title_filter` and `location_filter` in `companies.yml` from the confirmed targets. Companies word titles differently ("Engineering Manager" vs "Manager, Software Engineering"), so write word-order variants as AND-groups — `manager + engineering` matches both. Add `negative` terms for look-alikes the user doesn't want (e.g. `sales`, `recruiter`, `intern`).
    - **Company suggestions:** 5–15 companies in the user's domain, each with its ATS board (Greenhouse/Lever/Ashby). Verify each by fetching its public board URL before adding it to `companies.yml` — a board that 404s doesn't get saved.
 
 6. **Show a one-screen summary** — profile facts count, inferred targets, deal-breakers, company count — and ask the user to confirm or edit in one turn. Apply their edits, then tell them to run `/jobpilot:scan`.

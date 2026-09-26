@@ -8,7 +8,7 @@ description: Show how a recruiter for a specific job would see the user's profil
 For one job: a recruiter's-eye critique of the user's profile, rewritten
 bullets, and (optionally) a tailored resume PDF in `out/`.
 
-`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; in Codex/Cursor it is `pluginRoot` from `~/.jobpilot.json` (details in the `jobpilot` skill).
+`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; anywhere else it is the folder two levels above this SKILL.md (the one containing `scripts/`).
 
 ## Non-negotiable rules (apply to every jobpilot mode)
 

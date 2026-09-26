@@ -8,7 +8,7 @@ description: Score unscored jobs in jobs.csv 0–100 against profile.md with a f
 Score each unscored job against the user's profile. The rubric is fixed so
 scores are comparable across jobs and across weeks.
 
-`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; in Codex/Cursor it is `pluginRoot` from `~/.jobpilot.json` (details in the `jobpilot` skill).
+`<pluginRoot>` below means `$CLAUDE_PLUGIN_ROOT` in Claude Code; anywhere else it is the folder two levels above this SKILL.md (the one containing `scripts/`).
 
 ## Non-negotiable rules (apply to every jobpilot mode)
 
