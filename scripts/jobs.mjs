@@ -21,6 +21,7 @@ import {
 } from './lib/workspace.mjs';
 import { isMainModule } from './lib/main.mjs';
 import { rankAll } from './lib/rank.mjs';
+import { loadProfile } from './lib/profile.mjs';
 import { sweepClosed, SWEEP_DEFAULT_LIMIT } from './lib/sweep.mjs';
 import { statsByBucket } from './lib/learn.mjs';
 import * as greenhouse from './providers/greenhouse.mjs';
@@ -130,8 +131,8 @@ async function main(argv) {
     const { unscored, status, ranked } = parseListArgs(rest);
     if (status && !STATUSES.includes(status)) usage(`status must be one of: ${STATUSES.join(', ')}`);
     if (ranked) {
-      // rank = fit × freshness (lib/rank.mjs); persists ranks.
-      const order = rankAll(jobs);
+      // rank = fit − capped age penalty (lib/rank.mjs); persists ranks.
+      const order = rankAll(jobs, Date.now(), loadProfile(root).profile.ranking);
       const rankById = new Map(order.map(({ job, rank }) => [job.id, String(rank)]));
       for (const j of jobs) j.rank = j.fit === '' ? '' : (rankById.get(j.id) ?? ''); // unscored → no rank yet
       writeJobs(root, jobs);

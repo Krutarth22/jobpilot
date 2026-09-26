@@ -19,7 +19,7 @@ checklist, same score, every time.
 
 ## Steps (per unscored job)
 
-1. List what needs scoring — `--ranked` is the default view (fit × freshness; unscored jobs come out freshest first):
+1. List what needs scoring — `--ranked` is the default view (fit minus up to 10 points for age; unscored jobs come out newest first):
    ```sh
    node "<pluginRoot>/scripts/jobs.mjs" list --unscored --ranked
    ```

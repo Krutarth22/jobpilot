@@ -2,33 +2,50 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as rank from '../scripts/lib/rank.mjs';
 
-const { freshness, rankOf, rankAll, HALF_LIFE_DAYS } = rank;
-const DAY = 86_400_000;
+const { agePenalty, rankOf, rankAll, DAYS_PER_POINT, MAX_AGE_PENALTY } = rank;
 const NOW = Date.parse('2026-09-26T00:00:00Z');
 
-test('freshness: 14-day half-life decay', () => {
-  assert.equal(freshness('2026-09-26', NOW), 1.0); // today
-  const half = freshness(new Date(NOW - HALF_LIFE_DAYS * DAY).toISOString().slice(0, 10), NOW);
-  assert.ok(Math.abs(half - 0.5) < 0.01, `half-life should be ~0.5, got ${half}`);
-  const quarter = freshness(new Date(NOW - 2 * HALF_LIFE_DAYS * DAY).toISOString().slice(0, 10), NOW);
-  assert.ok(Math.abs(quarter - 0.25) < 0.01);
-  assert.ok(freshness('2026-01-01', NOW) < 0.001); // old postings sink
+test('agePenalty: 1 point per 5 days, capped at 10', () => {
+  assert.equal(DAYS_PER_POINT, 5);
+  assert.equal(MAX_AGE_PENALTY, 10);
+  assert.equal(agePenalty('2026-09-26', NOW), 0); // today
+  assert.equal(agePenalty('2026-09-16', NOW), 2); // 10 days
+  assert.equal(agePenalty('2026-08-11', NOW), 9.2); // 46 days
+  assert.equal(agePenalty('2026-01-01', NOW), 10); // capped
 });
 
-test('freshness: missing or malformed date is neutral (1.0), never guessed', () => {
-  assert.equal(freshness('', NOW), 1.0);
-  assert.equal(freshness('not-a-date', NOW), 1.0);
-  assert.equal(freshness(undefined, NOW), 1.0);
+test('agePenalty: missing or malformed date costs nothing, never guessed', () => {
+  assert.equal(agePenalty('', NOW), 0);
+  assert.equal(agePenalty('not-a-date', NOW), 0);
+  assert.equal(agePenalty(undefined, NOW), 0);
 });
 
-test('rankOf: fit × freshness', () => {
-  assert.equal(rankOf(80, 1.0), 80);
-  assert.equal(rankOf(80, 0.5), 40);
-  assert.equal(rankOf('', 1.0), 0);
+test('agePenalty: profile ranking options override the defaults; 0 turns it off', () => {
+  assert.equal(agePenalty('2026-09-16', NOW, { days_per_point: 10 }), 1);
+  assert.equal(agePenalty('2026-01-01', NOW, { max_age_penalty: 20 }), 20);
+  assert.equal(agePenalty('2026-01-01', NOW, { max_age_penalty: 0 }), 0);
+  assert.equal(agePenalty('2026-09-16', NOW, { days_per_point: 'junk' }), 2); // bad value → default
+});
+
+test('rankOf: fit minus penalty, never below 0; unscored is 0', () => {
+  assert.equal(rankOf(80, 0), 80);
+  assert.equal(rankOf('84', 9.2), 75);
+  assert.equal(rankOf(5, 10), 0);
+  assert.equal(rankOf('', 0), 0);
+  assert.equal(rankOf(undefined, 0), 0);
+});
+
+test('an old strong match that is still open is not sunk by age (46-day fit 84 regression)', () => {
+  const jobs = [
+    { id: '1', fit: '84', posted: '2026-08-11' }, // 46 days old
+    { id: '2', fit: '70', posted: '2026-09-26' }, // today
+  ];
+  const [first] = rankAll(jobs, NOW);
+  assert.equal(first.job.id, '1');
+  assert.equal(first.rank, 75);
 });
 
 test('pay is not a second rank factor (fit already carries comp)', () => {
-  assert.equal(rank.compFactor, undefined);
   const jobs = [
     { id: '1', fit: '70', posted: '2026-09-26', salary: 'USD 60k-70k' },
     { id: '2', fit: '70', posted: '2026-09-26', salary: 'USD 300k-320k' },
@@ -37,20 +54,26 @@ test('pay is not a second rank factor (fit already carries comp)', () => {
   assert.equal(a.rank, b.rank);
 });
 
-test('rankAll: sorts best-first by fit × freshness', () => {
+test('rankAll: best matches first; among similar matches, newest first', () => {
   const jobs = [
-    { id: '1', fit: '85', posted: '2026-09-20' },
-    { id: '2', fit: '85', posted: '2026-09-26' },
-    { id: '3', fit: '90', posted: '2026-01-01' },
-    { id: '4', fit: '70', posted: '2026-09-26' },
+    { id: '1', fit: '85', posted: '2026-09-20' }, // 6 days → 84
+    { id: '2', fit: '85', posted: '2026-09-26' }, // 85
+    { id: '3', fit: '90', posted: '2026-01-01' }, // capped → 80
+    { id: '4', fit: '70', posted: '2026-09-26' }, // 70
+    { id: '5', fit: '81', posted: '2026-09-26' }, // 81 — beats #3 on rank
   ];
-  const order = rankAll(jobs, NOW).map(({ job }) => job.id);
-  // #2 (same fit, fresher) beats #1; six days of decay drops #1 (85 → ~63)
-  // below #4 posted today (70); #3's high fit has decayed to almost nothing.
-  assert.deepEqual(order, ['2', '4', '1', '3']);
+  assert.deepEqual(rankAll(jobs, NOW).map(({ job }) => job.id), ['2', '1', '5', '3', '4']);
 });
 
-test('rankAll: unscored jobs come out freshest-first', () => {
+test('rankAll: equal rank breaks ties newest-first', () => {
+  const jobs = [
+    { id: '1', fit: '82', posted: '2026-09-16' }, // 82 − 2 = 80
+    { id: '2', fit: '80', posted: '2026-09-26' }, // 80
+  ];
+  assert.deepEqual(rankAll(jobs, NOW).map(({ job }) => job.id), ['2', '1']);
+});
+
+test('rankAll: unscored jobs come out newest-first', () => {
   const jobs = [
     { id: '1', fit: '', posted: '2026-08-01' },
     { id: '2', fit: '', posted: '2026-09-25' },

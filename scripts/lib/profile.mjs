@@ -72,6 +72,8 @@ export function normalizeProfile(frontmatter = {}) {
     // raw intent preserved, so a user-set 40/25/15/10/10 stays as written.
     weights: wsum > 0 ? weights : DEFAULT_WEIGHTS,
     anchors: Array.isArray(frontmatter.anchors) ? frontmatter.anchors : [],
+    // Age penalty for the ranked list (lib/rank.mjs); missing → defaults.
+    ranking: frontmatter.ranking && typeof frontmatter.ranking === 'object' ? frontmatter.ranking : {},
     // Links the resume itself points to (GitHub, personal site, LinkedIn, …).
     // Passed through as-is: claims.mjs's self-check treats a missing link as
     // "Not assessable", never adverse — it never guesses a URL.

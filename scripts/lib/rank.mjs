@@ -1,43 +1,61 @@
-// Rank = fit × freshness.
+// Rank = fit − a small, capped age penalty.
 //
-// Fit alone ranks a 6-week-old posting next to one posted this morning.
-// Freshness decays with a ~14-day half-life from `posted` (falling back to
-// `found`). Pay is NOT a separate factor here: fit already carries the comp
-// component (score.mjs), and multiplying by it again would count pay twice.
-// Unknown dates are neutral (1.0) — ranking never guesses.
+// Best matches first; among similar matches, newest first. A posting loses
+// 1 point per 5 days since `posted` (falling back to `found`), capped at 10,
+// so age breaks ties but never sinks a strong match that's still open —
+// closed postings are removed by the sweep, not by decay. (A multiplicative
+// decay did: fit 84 at 46 days ranked 8, below any fresh fit-10 job.)
+// Pay is NOT a separate factor: fit already carries the comp component.
+// Unknown dates cost nothing — ranking never guesses.
+//
+// Tunable per user in profile.md: `ranking: { days_per_point: 5, max_age_penalty: 10 }`.
 
-export const HALF_LIFE_DAYS = 14;
+export const DAYS_PER_POINT = 5;
+export const MAX_AGE_PENALTY = 10;
 
-function daysBetween(fromIso, nowMs) {
-  const t = Date.parse(`${String(fromIso).slice(0, 10)}T00:00:00Z`);
+export function ageDays(postedIso, nowMs = Date.now()) {
+  const t = Date.parse(`${String(postedIso ?? '').slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(t)) return null;
   return Math.max(0, (nowMs - t) / 86_400_000);
 }
 
-/** Exponential decay with a half-life; missing/invalid date → 1.0 (neutral). */
-export function freshness(postedIso, nowMs = Date.now(), halfLifeDays = HALF_LIFE_DAYS) {
-  const days = daysBetween(postedIso, nowMs);
-  if (days === null) return 1.0;
-  return Math.pow(0.5, days / halfLifeDays);
+function rankingOptions(opts = {}) {
+  const perPoint = Number(opts.days_per_point);
+  const cap = opts.max_age_penalty == null ? NaN : Number(opts.max_age_penalty);
+  return {
+    daysPerPoint: perPoint > 0 ? perPoint : DAYS_PER_POINT,
+    maxPenalty: cap >= 0 ? cap : MAX_AGE_PENALTY, // 0 turns the age penalty off
+  };
 }
 
-/** rank = fit × freshness, 0–100 rounded. */
-export function rankOf(fit, fresh) {
-  return Math.round((Number(fit) || 0) * fresh);
+/** Points lost to age; missing/invalid date → 0 (neutral). */
+export function agePenalty(postedIso, nowMs = Date.now(), opts = {}) {
+  const days = ageDays(postedIso, nowMs);
+  if (days === null) return 0;
+  const { daysPerPoint, maxPenalty } = rankingOptions(opts);
+  return Math.min(maxPenalty, days / daysPerPoint);
+}
+
+/** rank = fit − penalty, 0–100 rounded; unscored → 0. */
+export function rankOf(fit, penalty) {
+  if (fit === '' || fit == null || Number.isNaN(Number(fit))) return 0;
+  const n = Number(fit);
+  return Math.max(0, Math.round(n - penalty));
 }
 
 /**
  * Compute ranks for all jobs and return them sorted best-first. Unscored
- * jobs (rank 0) come out freshest-first, so `match` scores the newest
+ * jobs (rank 0) come out newest-first, so `match` scores the newest
  * postings before the stale ones. Does not write — callers decide.
  */
-export function rankAll(jobs, nowMs = Date.now()) {
+export function rankAll(jobs, nowMs = Date.now(), opts = {}) {
   const ranked = jobs.map((job) => {
-    const fresh = freshness(job.posted || job.found || '', nowMs);
-    return { job, rank: rankOf(job.fit, fresh), freshness: fresh };
+    const date = job.posted || job.found || '';
+    const age = ageDays(date, nowMs);
+    return { job, rank: rankOf(job.fit, agePenalty(date, nowMs, opts)), age: age ?? 0 };
   });
   ranked.sort((a, b) => b.rank - a.rank
-    || b.freshness - a.freshness
+    || a.age - b.age
     || String(a.job.id).localeCompare(String(b.job.id), undefined, { numeric: true }));
   return ranked;
 }
