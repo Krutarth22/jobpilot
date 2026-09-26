@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // jobpilot claims — the candidate-side claim self-check, ported from the
 // resume-claim-verification skill's validate_report.py / generate_report.py
-// (https://github.com/Krutarth22/resume-claim-verification, MIT).
+// (https://github.com/Krutarth22/resume-claim-verification, same author).
 //
 // That skill is reviewer-side: a recruiter checks a candidate's claims
 // against public evidence and writes a neutral dossier. Here the "reviewer"
