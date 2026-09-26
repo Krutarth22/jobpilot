@@ -1,0 +1,25 @@
+{
+  "report_version": "1.0",
+  "candidate_label": "Candidate C",
+  "review_date": "2026-09-02",
+  "reviewed_inputs": ["Resume"],
+  "overall_conclusion": "Insufficient evidence",
+  "summary": "The principal work claim concerns a confidential internal system and cannot be assessed from the supplied material.",
+  "claims": [
+    {
+      "id": "C1",
+      "category": "Employment project",
+      "claim": "Designed an internal forecasting platform for a confidential client.",
+      "assessment": "Not assessable",
+      "confidence": "High",
+      "observations": ["No inspectable artifact or authorized private verification source was supplied."],
+      "inference": "The claim cannot be independently assessed from the available inputs.",
+      "evidence": [],
+      "alternative_explanations": ["Client confidentiality may legitimately prevent public documentation."],
+      "follow_up_questions": ["Can you describe non-confidential design decisions, constraints, and tradeoffs?"],
+      "next_step": "Use a structured interview or consent-based reference check without requesting confidential material."
+    }
+  ],
+  "sources": [],
+  "limitations": ["The claimed work is described as confidential."]
+}

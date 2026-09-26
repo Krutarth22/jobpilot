@@ -1,0 +1,80 @@
+{
+  "report_version": "1.0",
+  "candidate_label": "Candidate B",
+  "review_date": "2026-09-02",
+  "reviewed_inputs": ["Resume", "Portfolio", "Repository history", "Employer product page"],
+  "overall_conclusion": "Human review recommended",
+  "summary": "One claim matches the available evidence. One needs an explanation. One important detail does not match the repository history.",
+  "claims": [
+    {
+      "id": "C1",
+      "category": "Technology",
+      "claim": "Used React and Node.js on the inventory application.",
+      "assessment": "Supported",
+      "confidence": "High",
+      "observations": ["The linked repository contains React client code and a Node.js service."],
+      "inference": "The technology used in the linked project matches the claim.",
+      "evidence": [
+        {
+          "source": "Repository dependency manifests",
+          "finding": "React and Node.js dependencies are present.",
+          "url": "https://example.com/repository"
+        }
+      ],
+      "alternative_explanations": [],
+      "follow_up_questions": [],
+      "next_step": "Ask normal technical questions if this experience matters for the job."
+    },
+    {
+      "id": "C2",
+      "category": "Claimed result",
+      "claim": "The migration reduced processing time by 70 percent.",
+      "assessment": "Needs clarification",
+      "confidence": "Medium",
+      "observations": ["The product launch is documented, but the starting point and calculation for the 70 percent figure were not provided."],
+      "inference": "The improvement may be real, but the available information does not show how the 70 percent figure was measured or how much of the result came from the candidate's work.",
+      "evidence": [
+        {
+          "source": "Employer product page",
+          "finding": "A migration occurred during the stated period.",
+          "url": "https://example.com/product-release"
+        }
+      ],
+      "alternative_explanations": ["The metric may come from an internal dashboard that is not public."],
+      "follow_up_questions": ["What did you compare, what time period did you measure, and where did the numbers come from?"],
+      "next_step": "Ask how the number was calculated and what work the candidate personally did."
+    },
+    {
+      "id": "C3",
+      "category": "Project ownership",
+      "claim": "Created the linked inventory application.",
+      "assessment": "Material inconsistency",
+      "confidence": "High",
+      "observations": ["The repository existed before the claimed work began, and a different account created the first version."],
+      "inference": "The history shows later contributions from the candidate, but it does not support the claim that the candidate created the project alone.",
+      "evidence": [
+        {
+          "source": "Repository commit history",
+          "finding": "A different account created the repository and its first version.",
+          "url": "https://example.com/repository/commits"
+        }
+      ],
+      "alternative_explanations": ["The project may have been moved from a private repository or created under another account that belongs to the candidate."],
+      "follow_up_questions": ["Which parts did you personally create, and was earlier work moved from another repository?"],
+      "next_step": "Have the candidate walk through a representative contribution and explain the repository history."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Candidate-provided repository",
+      "url": "https://example.com/repository",
+      "accessed": "2026-09-02"
+    },
+    {
+      "label": "Employer product page",
+      "url": "https://example.com/product-release",
+      "accessed": "2026-09-02"
+    }
+  ],
+  "limitations": ["The review did not include private employer records or reference checks."]
+}

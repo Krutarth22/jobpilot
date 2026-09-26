@@ -1,0 +1,35 @@
+{
+  "report_version": "1.0",
+  "candidate_label": "Candidate E",
+  "review_date": "2026-09-02",
+  "reviewed_inputs": ["Resume", "Candidate-provided professional profile"],
+  "overall_conclusion": "No material issues found",
+  "summary": "The one-month date difference is consistent with ordinary month-level rounding and does not create a material conflict.",
+  "claims": [
+    {
+      "id": "C1",
+      "category": "Employment dates",
+      "claim": "Worked at Example Labs from January 2023 through June 2024.",
+      "assessment": "Plausible but unverified",
+      "confidence": "Medium",
+      "observations": ["The candidate-provided profile lists February 2023 through June 2024."],
+      "inference": "The difference is minor and may reflect offer, onboarding, payroll, or month-rounding conventions.",
+      "evidence": [
+        {
+          "source": "Candidate-provided professional profile",
+          "finding": "The end month matches and the start month differs by one month."
+        }
+      ],
+      "alternative_explanations": ["The resume may use the offer or onboarding month while the profile uses the payroll start month."],
+      "follow_up_questions": [],
+      "next_step": "No special follow-up is needed unless exact dates are independently material."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Candidate-provided professional profile",
+      "accessed": "2026-09-02"
+    }
+  ],
+  "limitations": []
+}

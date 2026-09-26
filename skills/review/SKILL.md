@@ -34,12 +34,24 @@ tailored resume that passes the fact gate and an ATS round-trip.
    ```
    Present it as a table: **must-have coverage %** (from the match checklist), **keyword coverage %** (+ the missing skills), **30-second screen verdict** with its check list, and the ATS check once a PDF exists.
 4. **Judge the one AI item in the screen** — "is the company or domain recognizable for this role" — from the JD and your market knowledge. State it as its own line, never folded into the code checks.
-5. Read `profile.md` and produce the prose critique, structured as:
+5. **Claim self-check** — a candidate-side pass over your own resume, so nothing in it surprises you when a recruiter checks it first. See [references/claim-rubric.md](references/claim-rubric.md) for the assessment rules (ported from resume-claim-verification).
+   - If `<workspace>/claims.json` is missing, or `node "<pluginRoot>/scripts/claims.mjs" for-job <id>` reports it stale (profile.md changed since it was built), build it once:
+     1. Split `profile.md` into atomic, checkable claims — one per employer, title, date range, degree, project-authorship statement, technology, and quantified metric. Don't judge a whole paragraph at once.
+     2. Check internal consistency first (do the dates line up across sections, does a metric appear the same way twice) before reaching for anything external.
+     3. Only then check your **own** links — `profile.md`'s `links:` front matter (GitHub, website, LinkedIn, `other`). A link that's missing makes that claim `Not assessable`, never adverse.
+     4. **Ask the user before any wider web search.** A search-result snippet is never evidence by itself — only something you can actually open and read counts.
+     5. Write `<workspace>/claims.json`: a report matching `report-schema`-style claims (`id`, `category`, `claim`, `assessment`, `confidence`, `observations`, `inference`, `evidence`, `alternative_explanations`, `follow_up_questions`, `next_step`), plus `profile_sha256` — sha256 of the current `profile.md` text (this is what lets `for-job` detect a stale build later). `candidate_label` can be anything; `validate` forces it to `"You"`.
+     6. Validate it: `node "<pluginRoot>/scripts/claims.mjs" validate "<workspace>/claims.json"`. Fix and re-run on any error — never hand-wave past a validation failure.
+   - Run `node "<pluginRoot>/scripts/claims.mjs" for-job <id>` and present each returned claim: its plain label (never the internal value), what was found, the question a recruiter would likely ask, and a suggested fix — add a link, reword the claim, or prep an answer for the interview.
+   - **Rule:** no rewritten bullet may ever strengthen a claim flagged `Needs clarification` or `Material inconsistency` — e.g. "Contributed to X" must not become "Built X" just because it reads better.
+   - Offer an optional PDF: `node "<pluginRoot>/scripts/claims.mjs" render "<workspace>/claims.json" "<workspace>/out/claims-report.pdf"`.
+   - Keep the framing neutral throughout — never say fake, lied, or fraud; "could not be independently verified," not "didn't happen."
+6. Read `profile.md` and produce the prose critique, structured as:
    - **Strengths** — where the profile exceeds the JD's asks (cite both sides).
    - **Gaps** — what the JD wants that the profile can't back. Honesty is the feature.
    - **Missing keywords** — JD terms the resume vocabulary lacks *and* the profile genuinely supports (reformulated, never fabricated).
-   - **Rewritten bullets** — for the 3–5 most relevant profile bullets: reframe and reorder for this JD. Show `before → after` so the user can audit every change against `profile.md`. Run them through the bullet lint (step 6) before showing.
-6. Ask whether to generate the tailored PDF. If yes:
+   - **Rewritten bullets** — for the 3–5 most relevant profile bullets: reframe and reorder for this JD. Show `before → after` so the user can audit every change against `profile.md`. Never let a rewrite strengthen a claim the self-check flagged `Needs clarification` or `Material inconsistency` (step 5's rule). Run them through the bullet lint (step 7) before showing.
+7. Ask whether to generate the tailored PDF. If yes:
    - Fill `templates/resume.html` (copy it, replace the `{{PLACEHOLDER}}` fields) with profile facts + the rewritten bullets. Save the HTML in `<workspace>/out/`.
    - **Fact gate BEFORE rendering** — this blocks the PDF on failure:
      ```sh
@@ -53,4 +65,4 @@ tailored resume that passes the fact gate and an ATS round-trip.
      ```
      This parses the PDF back the way an ATS would and checks headings, reading order and skill tokens survive. Fix the HTML if anything is lost.
    - Save the critique next to them as `out/review-<id>-<company-slug>.md`.
-7. Report: the scorecard, the PDF path, page count, the lint findings, and remind the user: every bullet is traceable to `profile.md` — tell me if anything reads wrong and I'll fix the source, not just the copy.
+8. Report: the scorecard, the claim self-check findings, the PDF path, page count, the lint findings, and remind the user: every bullet is traceable to `profile.md` — tell me if anything reads wrong and I'll fix the source, not just the copy.

@@ -15,6 +15,7 @@
 //   weights: { skills: 35, seniority: 25, domain: 15, location: 15, comp: 10 }
 //   anchors:
 //     - { title: ..., company: ..., summary: ..., score: 70 }
+//   links: { github: ..., website: ..., linkedin: ..., other: [...] }
 //   ---
 //
 // A MISSING FIELD means that signal is scored "unknown" (neutral) — never
@@ -71,6 +72,15 @@ export function normalizeProfile(frontmatter = {}) {
     // raw intent preserved, so a user-set 40/25/15/10/10 stays as written.
     weights: wsum > 0 ? weights : DEFAULT_WEIGHTS,
     anchors: Array.isArray(frontmatter.anchors) ? frontmatter.anchors : [],
+    // Links the resume itself points to (GitHub, personal site, LinkedIn, …).
+    // Passed through as-is: claims.mjs's self-check treats a missing link as
+    // "Not assessable", never adverse — it never guesses a URL.
+    links: frontmatter.links && typeof frontmatter.links === 'object' && !Array.isArray(frontmatter.links)
+      ? {
+        ...frontmatter.links,
+        other: Array.isArray(frontmatter.links.other) ? frontmatter.links.other.map(String) : [],
+      }
+      : {},
   };
 }
 

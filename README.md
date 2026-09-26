@@ -52,7 +52,7 @@ flowchart LR
 | ⚙️ **setup** | Reads your resume and works out which roles, seniority and locations fit you, then asks you to confirm | Your profile, plus a list of companies to watch |
 | 🔍 **scan** | Checks the job boards of every company on your list (a curated, live-verified seed of 100+ boards). Keeps each posting's **date and salary**, flags likely **reposts**, auto-sweeps **closed** postings, and reports **near-miss** titles your filters may be too narrow for | New jobs added to your tracker (with posting age and pay), plus filter suggestions |
 | 📊 **match** | An AI reads the job description and your profile and writes an **evidence-backed checklist** (every "met" verdict must quote your profile); a deterministic script turns that checklist into the score. Skills, seniority, domain, location and pay — with hard caps for deal-breakers | A fit score plus a per-signal breakdown (e.g. `S22/35 Sn20/25 D10/15 L15/15 C?/10`), stored in `evals/<id>.json` so you can audit exactly why a job scored what it did. It also learns: your feedback and outcomes tune the scoring weights over time (`learn.mjs`, proposal-only until you confirm) |
-| 🧐 **review** | Reads your profile the way that job's recruiter would | Your strengths, honest gaps, missing keywords, rewritten bullet points, and an optional tailored resume PDF |
+| 🧐 **review** | Reads your profile the way that job's recruiter would, and runs a claim self-check on your own resume before they do | Your strengths, honest gaps, missing keywords, rewritten bullet points, a claim-by-claim self-check (what a recruiter might question and how to answer it), and an optional tailored resume PDF |
 | 🤝 **contact** | Looks up the likely recruiter or hiring manager | Who they are, why they're the right person, and a LinkedIn note under 300 characters |
 | 📝 **apply** | Opens the real application form in a browser and fills it in from your profile | A filled form, a screenshot, and a list of the fields it couldn't answer. **It stops before Submit.** |
 
@@ -198,11 +198,17 @@ Your title filter is probably too narrow. Open `companies.yml` and add more word
 Every scan also prints **near misses** — titles that passed your location filter, failed your title filter, and still share keywords with your target titles — with the exact keywords to add, so you don't have to guess.
 </details>
 
+<details>
+<summary><b>Will a recruiter be able to verify my resume?</b></summary>
+
+Some of it, yes — and `review` checks the same way a recruiter would, before they do. It splits your `profile.md` into atomic claims (employer, dates, project authorship, metrics, …), checks internal consistency, and — only with your go-ahead — checks your own links (GitHub, site, LinkedIn). Each claim gets one of five neutral labels (from "matches the evidence" to "important details don't match"), never a fraud or hiring verdict, and unverifiable never means false. The output is a private checklist for you, with the question a recruiter might ask and how you'd answer it — not something that gets sent anywhere.
+</details>
+
 ---
 
 ## Credits
 
-Parts of the job-board scanning, PDF rendering and closed-posting detection are adapted from [career-ops](https://github.com/santifer/career-ops) by santifer (MIT).
+Parts of the job-board scanning, PDF rendering and closed-posting detection are adapted from [career-ops](https://github.com/santifer/career-ops) by santifer (MIT). The claim self-check in `review` is adapted from [resume-claim-verification](https://github.com/Krutarth22/resume-claim-verification) (MIT).
 
 **Coming later:** more job sources (LinkedIn, Workday), scheduled scans, and cover letters.
 

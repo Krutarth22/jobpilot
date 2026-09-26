@@ -12,10 +12,12 @@
 // Idea adapted from career-ops verify-cv-facts.mjs (MIT).
 
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { isMainModule } from './lib/main.mjs';
 import { workspaceRoot, profilePath } from './lib/workspace.mjs';
 import { extractSkills } from './lib/skills.mjs';
 import { extractText } from './parse-resume.mjs';
+import { claimsPath, validateClaims } from './claims.mjs';
 
 function foldDigits(text) {
   return String(text).normalize('NFKC').replace(/\u066a/g, '%').replace(/[\u00a0\u202f]/g, ' ');
@@ -158,6 +160,50 @@ export function auditResume({ tailoredText, roleLines = [], bullets = [], profil
   return { ok: violations.length === 0, violations, lint };
 }
 
+// ── Fact gate ↔ claim self-check advisory bridge ────────────────────────
+// If the user has run the review skill's claim self-check (claims.json),
+// warn — never block — when a tailored bullet's wording lands on a claim
+// already flagged "Material inconsistency" there. The fact gate only checks
+// numbers/dates/skills trace to profile.md; it has no opinion on whether a
+// TRUE claim is still worded in a way a recruiter would push back on.
+
+function significantWords(text) {
+  return new Set(String(text || '').toLowerCase().match(/[a-z][a-z0-9+.#-]{3,}/g) || []);
+}
+
+/** Bullets whose wording overlaps a claim already flagged "Material
+ * inconsistency" in claims.json. Advisory only — never touches `ok`. */
+export function claimWarnings(bullets, claimsReport) {
+  const material = (claimsReport?.claims || []).filter((c) => c.assessment === 'Material inconsistency');
+  if (material.length === 0) return [];
+  const warnings = [];
+  for (const bullet of bullets) {
+    const bulletWords = significantWords(bullet);
+    for (const claim of material) {
+      const claimWords = significantWords(claim.claim);
+      if (claimWords.size === 0) continue;
+      const overlap = [...claimWords].filter((w) => bulletWords.has(w)).length;
+      if (overlap / claimWords.size >= 0.5) {
+        warnings.push({
+          bullet, claimId: claim.id, claim: claim.claim,
+          message: `overlaps claim ${claim.id} ("${claim.claim}"), flagged "Important details don't match" in claims.json — verify the wording before using it`,
+        });
+      }
+    }
+  }
+  return warnings;
+}
+
+async function loadClaimsReport(root) {
+  const p = claimsPath(root);
+  if (!existsSync(p)) return null;
+  try {
+    return validateClaims(JSON.parse(await readFile(p, 'utf8')));
+  } catch {
+    return null; // advisory hook: a broken claims.json never blocks the fact gate
+  }
+}
+
 // ── CLI ─────────────────────────────────────────────────────────────────
 
 async function loadTailoredText(file) {
@@ -181,13 +227,16 @@ async function main(argv) {
   const roleLines = lines.filter((l) => /·/.test(l) || /^[A-Z][\w.&' ]+(?:Engineer|Manager|Designer|Director|Lead|Developer|Scientist|Analyst)(?:[ ,:-].*)?$/.test(l));
 
   const audit = auditResume({ tailoredText: tailored, roleLines, bullets, profileText });
-  console.log(JSON.stringify({ ok: audit.ok, violations: audit.violations, lint: audit.lint }, null, 2));
+  const claimsReport = await loadClaimsReport(root);
+  const claimWarns = claimsReport ? claimWarnings(bullets, claimsReport) : [];
+  console.log(JSON.stringify({ ok: audit.ok, violations: audit.violations, lint: audit.lint, claimWarnings: claimWarns }, null, 2));
   if (!audit.ok) {
     console.error(`❌ fact gate FAILED: ${audit.violations.length} violation(s). Fix the source (profile.md) or the bullet — do not render.`);
     process.exit(1);
   }
   console.error('✅ fact gate passed: every number, date, company/title and skill traces to profile.md');
   if (audit.lint.length > 0) console.error(`✏️  ${audit.lint.length} style suggestion(s) from the bullet lint — optional.`);
+  if (claimWarns.length > 0) console.error(`⚠️  ${claimWarns.length} bullet(s) overlap a claim flagged "Important details don't match" in claims.json — advisory only, does not block.`);
 }
 
 if (isMainModule(import.meta.url)) {

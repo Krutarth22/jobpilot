@@ -1,0 +1,25 @@
+{
+  "report_version": "1.0",
+  "candidate_label": "Candidate D",
+  "review_date": "2026-09-02",
+  "reviewed_inputs": ["Resume", "Authorized public professional-source search"],
+  "overall_conclusion": "Insufficient evidence",
+  "summary": "No reliable public professional record was found, and the employment claim remains unverified without contradictory evidence.",
+  "claims": [
+    {
+      "id": "C1",
+      "category": "Employment",
+      "claim": "Worked as a software engineer at a small private company from 2022 to 2024.",
+      "assessment": "Plausible but unverified",
+      "confidence": "Low",
+      "observations": ["The search produced no source that could be reliably matched to the candidate."],
+      "inference": "The absence of a public profile neither supports nor conflicts with the employment claim.",
+      "evidence": [],
+      "alternative_explanations": ["The employer and candidate may maintain little or no public professional presence."],
+      "follow_up_questions": ["Would you consent to standard employment verification if it is required for this role?"],
+      "next_step": "If necessary, use an authorized consent-based employment verification process."
+    }
+  ],
+  "sources": [],
+  "limitations": ["Public-source coverage for small private employers may be incomplete."]
+}

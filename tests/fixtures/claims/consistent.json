@@ -1,0 +1,37 @@
+{
+  "report_version": "1.0",
+  "candidate_label": "Candidate A",
+  "review_date": "2026-09-02",
+  "reviewed_inputs": ["Resume", "Candidate-provided repository"],
+  "overall_conclusion": "No material issues found",
+  "summary": "The reviewed project claim is supported by candidate-provided repository history.",
+  "claims": [
+    {
+      "id": "C1",
+      "category": "Project authorship",
+      "claim": "Implemented the API validation module in the linked project.",
+      "assessment": "Supported",
+      "confidence": "High",
+      "observations": ["The repository attributes the module and related tests to the candidate's confirmed account."],
+      "inference": "The available repository history supports the stated implementation contribution.",
+      "evidence": [
+        {
+          "source": "Candidate-provided repository history",
+          "finding": "The confirmed account authored the module and its tests.",
+          "url": "https://example.com/repository/commits"
+        }
+      ],
+      "alternative_explanations": [],
+      "follow_up_questions": [],
+      "next_step": "No verification follow-up is required for this claim."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Candidate-provided repository",
+      "url": "https://example.com/repository",
+      "accessed": "2026-09-02"
+    }
+  ],
+  "limitations": []
+}
