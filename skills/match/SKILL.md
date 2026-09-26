@@ -46,6 +46,15 @@ checklist, same score, every time.
    ```
 6. If the output says `recheck: true` — the checklist score disagrees with the raw keyword overlap by >25 points, which usually means a hallucinated `met`. **Re-run the checklist once** (step 4–5) with stricter evidence. If the disagreement persists, flag the row to the user instead of forcing agreement.
 7. When finished, show a ranked table: `#id · fit · breakdown · company · title · one-line reason` (use the breakdown, e.g. `S30/35 Sn20/25 D10/15 L15/15 C5/10`). Suggest `/jobpilot:review <id>` for the best 1–3.
+8. **Close the learning loop** — early in the session, check whether any `applied` jobs are older than ~10 days and ask: "you applied to #12 two weeks ago — any update?" Record what the user says:
+   ```sh
+   node "<pluginRoot>/scripts/jobs.mjs" outcome <id> interview|rejected|offer|ghosted
+   ```
+   If the user hand-rates a scored job ("I'd have said 60, not 82"), capture that too — it's what the weight fitter learns from:
+   ```sh
+   node "<pluginRoot>/scripts/jobs.mjs" feedback <id> <0-100> "why"
+   ```
+   Once ≥10 feedback rows exist, run `node "<pluginRoot>/scripts/learn.mjs"` and show the old → new weights proposal; **write nothing to profile.md unless the user confirms** (then re-run with `--write`).
 
 ## Output contract
 

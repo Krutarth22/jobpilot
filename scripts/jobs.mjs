@@ -9,16 +9,20 @@
 //   jobs.mjs status <id> <new|applied|closed>
 //   jobs.mjs note <id> "<text>"      appends to notes (never overwrites)
 //   jobs.mjs sweep [--limit=N]       liveness-check new/applied rows, close expired
+//   jobs.mjs feedback <id> <0-100> "why"   store your score (feeds learn.mjs)
+//   jobs.mjs outcome <id> interview|rejected|offer|ghosted
+//   jobs.mjs stats                   interview rate by fit bucket (scoring health)
 
 import { readFile } from 'node:fs/promises';
 import yaml from 'js-yaml';
 import {
-  workspaceRoot, readJobs, writeJobs, updateJobs, findJob, STATUSES,
+  workspaceRoot, readJobs, writeJobs, updateJobs, findJob, STATUSES, OUTCOMES, readEval, writeEval,
 } from './lib/workspace.mjs';
 import { isMainModule } from './lib/main.mjs';
 import { loadProfile } from './lib/profile.mjs';
 import { rankAll } from './lib/rank.mjs';
 import { sweepClosed, SWEEP_DEFAULT_LIMIT } from './lib/sweep.mjs';
+import { statsByBucket } from './lib/learn.mjs';
 import * as greenhouse from './providers/greenhouse.mjs';
 import * as lever from './providers/lever.mjs';
 import * as ashby from './providers/ashby.mjs';
@@ -27,7 +31,7 @@ const PROVIDERS = { greenhouse, lever, ashby };
 
 const usage = (msg) => {
   if (msg) console.error(`⚠️  ${msg}`);
-  console.error('Usage: jobs.mjs <list|show|get|score|status|note> ...');
+  console.error('Usage: jobs.mjs <list|show|get|score|status|note|sweep|feedback|outcome|stats> ...');
   process.exit(1);
 };
 
@@ -131,6 +135,20 @@ async function main(argv) {
     return;
   }
 
+  if (cmd === 'stats') {
+    // D4: if high scores don't lead to more interviews, scoring is miscalibrated.
+    const health = statsByBucket(jobs);
+    console.log(JSON.stringify(health, null, 2));
+    if (health.totalOutcomes < 15) {
+      console.error(`ℹ️  ${health.totalOutcomes}/15 outcomes recorded — the health verdict needs more history.`);
+    } else {
+      console.error(health.healthy
+        ? '✅ scoring health looks calibrated: higher fit buckets convert to interviews at higher rates.'
+        : '⚠️  miscalibration: high-fit jobs are NOT converting to interviews at higher rates. Run learn.mjs and revisit the rubric.');
+    }
+    return;
+  }
+
   const id = rest[0];
   if (!id) usage(`missing job id for "${cmd}"`);
   const job = findJob(root, id);
@@ -156,6 +174,21 @@ async function main(argv) {
     const note = rest.slice(1).join(' ').trim();
     if (!note) usage('note needs text');
     updateJobs(root, job.id, { notes: appendNote(job.notes, note) });
+  } else if (cmd === 'feedback') {
+    // D1: your score next to the computed one, in evals/<id>.json.
+    const score = Number(rest[1]);
+    const why = rest.slice(2).join(' ').trim();
+    if (!Number.isInteger(score) || score < 0 || score > 100) usage('feedback score must be an integer 0-100');
+    if (!why) usage('feedback needs a short "why" (this is what learn.mjs learns from)');
+    const ev = readEval(root, job.id) || { id: job.id, company: job.company, title: job.title, url: job.url };
+    ev.feedback = { user_score: score, why, at: new Date().toISOString() };
+    writeEval(root, job.id, ev);
+    updateJobs(root, job.id, { notes: appendNote(job.notes, `your score: ${score}`) });
+  } else if (cmd === 'outcome') {
+    const outcome = rest[1];
+    if (!OUTCOMES.includes(outcome)) usage(`outcome must be one of: ${OUTCOMES.join(', ')}`);
+    updateJobs(root, job.id, { outcome });
+    if (outcome === 'interview' && job.status === 'new') updateJobs(root, job.id, { status: 'applied' });
   } else {
     usage(`unknown command "${cmd}"`);
   }
