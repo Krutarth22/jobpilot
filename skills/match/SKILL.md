@@ -44,7 +44,11 @@ checklist, same score, every time.
    ```sh
    node "<pluginRoot>/scripts/score.mjs" <id>
    ```
-6. If the output says `recheck: true` — the checklist score disagrees with the raw keyword overlap by >25 points, which usually means a hallucinated `met`. **Re-run the checklist once** (step 4–5) with stricter evidence. If the disagreement persists, flag the row to the user instead of forcing agreement.
+6. If the output says `recheck: true`, **re-run the checklist once** (step 4–5), then flag the row to the user if it persists instead of forcing agreement. Two things trigger it:
+   - `prescoreMismatch` — the checklist score disagrees with the raw keyword overlap by >25 points, which usually means a hallucinated `met`. Re-check with stricter evidence.
+   - `untraced` — requirements whose wording can't be found in the job description (a tool it never names, or mostly words it doesn't use). Every requirement must come from the posting: paraphrase is fine, invention isn't. Drop or rewrite them from the page text.
+
+   If `prescore` is `null`, the posting had too few recognizable terms for the keyword cross-check; `score.mjs` notes that on the row. The evidence rule and the requirement check still apply.
 7. When finished, show a ranked table: `#id · fit · breakdown · company · title · one-line reason` (use the breakdown, e.g. `S30/35 Sn20/25 D10/15 L15/15 C5/10`). Suggest `/jobpilot:review <id>` for the best 1–3.
 8. **Close the learning loop** — early in the session, check whether any `applied` jobs are older than ~10 days and ask: "you applied to #12 two weeks ago — any update?" Record what the user says:
    ```sh

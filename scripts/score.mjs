@@ -26,8 +26,9 @@ import { loadProfile } from './lib/profile.mjs';
 import { fetchDescription } from './jobs.mjs';
 import {
   extractYears, extractLevel, extractWorkMode, extractSalary, parseSalaryColumn,
-  extractRequiredLanguages, keywordPreScore, levelDistance,
+  extractRequiredLanguages, keywordPreScore, levelDistance, jdTerms, MIN_PRESCORE_TERMS,
 } from './lib/signals.mjs';
+import { extractSkills } from './lib/skills.mjs';
 
 export const NEUTRAL = 50; // an "unknown" signal scores neutral, never zero
 
@@ -104,6 +105,42 @@ export function validateChecklist(checklist, profileBody, profileSkills = []) {
     }
   }
   return { clean: { requirements, domain }, downgraded };
+}
+
+// ── Requirement traceability: every requirement must come from the JD ──
+// The evidence rule catches invented "met" verdicts; this catches the other
+// half — a requirement the AI made up (or carried over from another job).
+// Paraphrase is fine, so match word stems, not the literal sentence.
+
+const GENERIC_REQ_WORDS = new Set([
+  'experience', 'years', 'year', 'strong', 'ability', 'knowledge', 'understanding',
+  'skills', 'skill', 'proven', 'track', 'record', 'working', 'work', 'including',
+  'demonstrated', 'solid', 'excellent', 'plus', 'preferred', 'required', 'familiarity',
+]);
+const stem = (w) => w.slice(0, 5);
+
+function contentStems(text) {
+  return normalizeText(text).split(' ')
+    .filter((w) => w.length >= 4 && !/^\d/.test(w) && !STOPWORDS.has(w) && !GENERIC_REQ_WORDS.has(w))
+    .map(stem);
+}
+
+/**
+ * Requirements whose wording can't be traced to the JD: a tool the JD never
+ * names, or under half of its content words (by stem) present in the JD.
+ * Empty JD → nothing to check against → [].
+ */
+export function untracedRequirements(requirements, jdText) {
+  if (!jdText || !jdText.trim()) return [];
+  const jdStems = new Set(contentStems(jdText));
+  const jdSkillKeys = new Set([...extractSkills(jdText)].map((s) => s.toLowerCase()));
+  return (requirements || []).filter((req) => {
+    const text = String(req?.text || '');
+    if ([...extractSkills(text)].some((s) => !jdSkillKeys.has(s.toLowerCase()))) return true;
+    const stems = contentStems(text);
+    if (stems.length < 2) return false; // too short to judge
+    return stems.filter((s) => jdStems.has(s)).length / stems.length < 0.5;
+  }).map((req) => req.text);
 }
 
 // ── Component scores ────────────────────────────────────────────────────
@@ -256,7 +293,9 @@ export function computeScore(checklist, signals, profile) {
   // keyword overlap smells like hallucinated "met" verdicts.
   const prescore = signals.prescore;
   const checklistSkills = skillsPct === null ? NEUTRAL : skillsPct;
-  const recheck = prescore !== null && Math.abs(prescore - checklistSkills) > 25;
+  const untraced = untracedRequirements(checklist.requirements, signals.jdText);
+  const prescoreMismatch = prescore !== null && Math.abs(prescore - checklistSkills) > 25;
+  const recheck = prescoreMismatch || untraced.length > 0;
 
   let fit = 0;
   let wsum = 0;
@@ -283,6 +322,9 @@ export function computeScore(checklist, signals, profile) {
     components,
     knockouts,
     prescore,
+    prescoreTerms: signals.prescoreTerms ?? null,
+    untraced,
+    prescoreMismatch,
     recheck,
     capped,
     skillsCoverage: total > 0 ? { met: metCount, of: total } : null,
@@ -305,6 +347,7 @@ export function buildSignals(jdText, job, profile, { profileBody, stage } = {}) 
     salary,
     requiredLanguages: extractRequiredLanguages(jdText),
     prescore: keywordPreScore(jdText, profile, profileBody || ''),
+    prescoreTerms: jdTerms(jdText, profile).length,
     stage: stage || null,
   };
 }
@@ -313,7 +356,7 @@ export function buildSignals(jdText, job, profile, { profileBody, stage } = {}) 
  * them up on every re-score; everything else in notes is kept. */
 export function scoreNotes(existing, fresh) {
   const kept = String(existing || '').split(' | ')
-    .filter((part) => part && !/^(recheck|knockout):/.test(part.trim()));
+    .filter((part) => part && !/^(recheck|knockout|cross-check skipped):/.test(part.trim()));
   return [...kept, ...(fresh.length > 0 ? [fresh.join('; ')] : [])].join(' | ');
 }
 
@@ -391,7 +434,16 @@ async function main(argv) {
   }
   writeEval(root, job.id, entry);
   const notes = [];
-  if (score.recheck) notes.push(`recheck: checklist score differs from keyword pre-score (${score.prescore})`);
+  if (score.prescoreMismatch) {
+    notes.push(`recheck: checklist score differs from keyword pre-score (${score.prescore})`);
+  }
+  if (score.untraced.length > 0) {
+    notes.push(`recheck: requirement not found in the job description: ${score.untraced.map((t) => `"${t}"`).join(', ')}`);
+  }
+  // Never skip the cross-check silently.
+  if (score.prescore === null && jdText.trim()) {
+    notes.push(`cross-check skipped: only ${score.prescoreTerms} recognizable term(s) in the job description (need ${MIN_PRESCORE_TERMS})`);
+  }
   if (score.knockouts.length > 0) notes.push(`knockout: ${score.knockouts.join('; ')}`);
   updateJobs(root, job.id, {
     fit: String(score.fit),
@@ -405,6 +457,8 @@ async function main(argv) {
     breakdown: score.breakdown,
     knockouts: score.knockouts,
     prescore: score.prescore,
+    prescoreTerms: score.prescoreTerms,
+    untraced: score.untraced,
     recheck: score.recheck,
     skillsCoverage: score.skillsCoverage,
   }, null, 2));

@@ -3,7 +3,7 @@
 // auditable. Used by score.mjs (component scores + knockouts + the keyword
 // pre-score) and by review.mjs.
 
-import { extractSkills } from './skills.mjs';
+import { extractSkills, extractTerms } from './skills.mjs';
 
 // Level ladder — two tracks (IC and management) mapped onto ONE scale.
 // Switching tracks costs one extra step: a manager applying to a staff IC
@@ -240,22 +240,35 @@ export function extractRequiredLanguages(jdText = '') {
 // ── Keyword pre-score (A6 cross-check) ─────────────────────────────────
 
 const JD_SKILL_CAP = 20; // dilution guard: a 60-skill JD can't dilute coverage to noise
+// Below this many recognizable JD terms the overlap is too thin to judge a
+// checklist by — the cross-check is skipped, and score.mjs says so.
+export const MIN_PRESCORE_TERMS = 5;
+
+/** The terms the cross-check recognizes in a JD: hard skills, practice
+ * terms, and the user's own listed skills. */
+export function jdTerms(jdText, profile = {}) {
+  return [...extractTerms(jdText, profile.skills || [])];
+}
 
 /**
- * Coverage of the JD's canonical skills by the profile's known skills,
- * 0–100. This is the PRE-score the checklist score is cross-checked against
- * (score.mjs flags |checklist - prescore| > 25 for a recheck).
+ * Coverage of the JD's recognizable terms by the profile's, 0–100. This is
+ * the PRE-score the checklist score is cross-checked against (score.mjs
+ * flags |checklist - prescore| > 25 for a recheck). null when the JD has
+ * fewer than MIN_PRESCORE_TERMS recognizable terms.
  */
 export function keywordPreScore(jdText, profile, profileBody = '') {
-  const jdSkills = [...extractSkills(jdText)];
-  if (jdSkills.length === 0) return null;
-  const known = new Set([...(profile.skills || []).map((s) => s.toLowerCase()), ...[...extractSkills(profileBody)].map((s) => s.toLowerCase())]);
-  const denom = Math.min(jdSkills.length, JD_SKILL_CAP);
-  const overlap = jdSkills.filter((s) => known.has(s.toLowerCase())).length;
-  return Math.round((overlap / denom) * 100);
+  const terms = jdTerms(jdText, profile);
+  if (terms.length < MIN_PRESCORE_TERMS) return null;
+  const known = new Set([
+    ...(profile.skills || []).map((s) => s.toLowerCase()),
+    ...[...extractTerms(profileBody, profile.skills || [])].map((t) => t.toLowerCase()),
+  ]);
+  const denom = Math.min(terms.length, JD_SKILL_CAP);
+  const overlap = terms.filter((t) => known.has(t.toLowerCase())).length;
+  return Math.min(100, Math.round((overlap / denom) * 100));
 }
 
 /** JD skills for the review scorecard (keyword coverage %). */
-export function jdSkillList(jdText) {
-  return [...extractSkills(jdText)];
+export function jdSkillList(jdText, profile = {}) {
+  return jdTerms(jdText, profile);
 }

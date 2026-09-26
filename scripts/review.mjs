@@ -16,7 +16,7 @@ import {
 } from './lib/workspace.mjs';
 import { isMainModule } from './lib/main.mjs';
 import { loadProfile } from './lib/profile.mjs';
-import { extractSkills } from './lib/skills.mjs';
+import { extractSkills, extractTerms } from './lib/skills.mjs';
 import { jdSkillList, extractLevel, levelDistance } from './lib/signals.mjs';
 import { fetchDescription } from './jobs.mjs';
 import { htmlToLines } from './check-resume.mjs';
@@ -33,9 +33,9 @@ export function mustHaveCoverage(checklist) {
 }
 
 export function keywordCoverage(jdText, profile, profileBody) {
-  const jdSkills = jdSkillList(jdText);
+  const jdSkills = jdSkillList(jdText, profile);
   if (jdSkills.length === 0) return { pct: null, missing: [] };
-  const known = new Set([...(profile.skills || []).map((s) => s.toLowerCase()), ...[...extractSkills(profileBody)].map((s) => s.toLowerCase())]);
+  const known = new Set([...(profile.skills || []).map((s) => s.toLowerCase()), ...[...extractTerms(profileBody, profile.skills || [])].map((t) => t.toLowerCase())]);
   const missing = jdSkills.filter((s) => !known.has(s.toLowerCase()));
   return { pct: Math.round(((jdSkills.length - missing.length) / jdSkills.length) * 100), missing };
 }
