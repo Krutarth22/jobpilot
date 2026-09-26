@@ -24,10 +24,15 @@
   .skills { display: block; }
   .skills p { margin: 2px 0; }
   .skills b { color: var(--muted); font-weight: 600; }
+  /* Keep a heading with what follows it, and a role in one piece, across page breaks. */
+  h2 { break-after: avoid; }
+  .role, li, header { break-inside: avoid; }
   footer { margin-top: 18px; color: var(--muted); font-size: 8.5pt; }
 </style>
 </head>
 <body>
+<!-- Fill every double-brace placeholder. Delete a contact <span> the profile has no value for
+     (e.g. no GitHub link) — an unfilled placeholder stops the build. -->
 <div class="page">
 
   <header>
@@ -37,6 +42,8 @@
       <span>{{PHONE}}</span>
       <span>{{LOCATION}}</span>
       <span>{{LINKEDIN}}</span>
+      <span>{{GITHUB}}</span>
+      <span>{{WEBSITE}}</span>
     </div>
   </header>
 

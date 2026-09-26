@@ -218,7 +218,9 @@ Everything stays on your computer, in one folder (`~/jobpilot/`) that plugin upd
 ├── jobs.csv        ← your tracker, which opens in Excel or Google Sheets
 ├── evals/          ← the reasons behind each job's score
 ├── claims.json     ← the resume claim check from review
-└── out/            ← tailored resumes and review notes
+└── out/
+    └── 12-figma/   ← one folder per job: your tailored resume
+                       (Jordan-Rivera-Resume.pdf), page previews, review notes
 ```
 
 Each job has one of three statuses: **new → applied → closed**. When you hear back, record how it went (interview, rejected, offer or no reply); jobpilot uses that to check whether its high scores really lead to interviews.
@@ -253,6 +255,25 @@ Each claim gets one of five plain labels:
 | ⚫ Unable to check | Private or confidential work, or no link to check |
 
 "Not enough evidence" **does not mean false**. Most real work isn't public. For each flagged claim you get the question a recruiter might ask and a suggested fix: add a link, reword it, or prepare an answer. The results are private to you and never sent anywhere.
+</details>
+
+<details>
+<summary><b>What's in a tailored resume?</b></summary>
+
+A copy of your resume rewritten for one job, using **only facts already in your profile**:
+
+- **What changes:** the summary is aimed at the role, the most relevant bullets move to the top and are reworded in the job's language, and the skills the job asks for (that you have) come first.
+- **What never changes:** employers, titles, dates, degrees and numbers. Nothing new is added.
+
+Before you see it, jobpilot checks it for you:
+
+1. **Fact check.** Any number, date, company or skill that isn't in your profile stops the PDF from being made.
+2. **Page check.** It fits on 1 page if you have under 10 years of experience, or 2 pages otherwise, and nothing runs off the edge.
+3. **Paper size.** Letter in the US and Canada, A4 elsewhere.
+4. **ATS check.** The PDF is read back the way an applicant tracking system reads it, and scored. You see the score before and after, for example **67 → 91**.
+5. **A look at every page**, so nothing is cut off and no heading is left alone at the bottom of a page.
+
+The file is named after you (`Jordan-Rivera-Resume.pdf`), not the company, because recruiters see the file name and often forward it. You can set `paper: a4` or `max_pages: 2` in `profile.md` to change the defaults.
 </details>
 
 <details>

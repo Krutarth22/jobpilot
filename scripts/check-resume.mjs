@@ -211,15 +211,10 @@ async function loadTailoredText(file) {
   return (await readFile(file, 'utf8'));
 }
 
-async function main(argv) {
-  const file = argv.find((a) => !a.startsWith('--'));
-  if (!file) {
-    console.error('Usage: node check-resume.mjs <tailored.html|pdf> [--jd <jd.txt>]');
-    process.exit(1);
-  }
-  const root = workspaceRoot();
+/** Run the whole fact gate on a tailored file against the workspace profile. */
+export async function checkResumeFile(root, file) {
   const profileText = await readFile(profilePath(root), 'utf8');
-  let tailored = await loadTailoredText(file);
+  const tailored = await loadTailoredText(file);
   const lines = tailored.includes('<') ? htmlToLines(tailored) : tailored.split('\n').map((l) => l.trim()).filter(Boolean);
 
   const bullets = lines.filter((l) => /^[•\-*]\s+/.test(l));
@@ -229,6 +224,17 @@ async function main(argv) {
   const audit = auditResume({ tailoredText: tailored, roleLines, bullets, profileText });
   const claimsReport = await loadClaimsReport(root);
   const claimWarns = claimsReport ? claimWarnings(bullets, claimsReport) : [];
+  return { ok: audit.ok, violations: audit.violations, lint: audit.lint, claimWarnings: claimWarns };
+}
+
+async function main(argv) {
+  const file = argv.find((a) => !a.startsWith('--'));
+  if (!file) {
+    console.error('Usage: node check-resume.mjs <tailored.html|pdf> [--jd <jd.txt>]');
+    process.exit(1);
+  }
+  const audit = await checkResumeFile(workspaceRoot(), file);
+  const claimWarns = audit.claimWarnings;
   console.log(JSON.stringify({ ok: audit.ok, violations: audit.violations, lint: audit.lint, claimWarnings: claimWarns }, null, 2));
   if (!audit.ok) {
     console.error(`❌ fact gate FAILED: ${audit.violations.length} violation(s). Fix the source (profile.md) or the bullet — do not render.`);

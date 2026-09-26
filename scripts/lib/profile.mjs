@@ -72,6 +72,11 @@ export function normalizeProfile(frontmatter = {}) {
     // raw intent preserved, so a user-set 40/25/15/10/10 stays as written.
     weights: wsum > 0 ? weights : DEFAULT_WEIGHTS,
     anchors: Array.isArray(frontmatter.anchors) ? frontmatter.anchors : [],
+    // Tailored-resume output (lib/resume-output.mjs): the name for the file
+    // recruiters see, paper size, and a page limit. Missing → inferred.
+    name: typeof frontmatter.name === 'string' ? frontmatter.name.trim() : '',
+    paper: ['letter', 'a4'].includes(String(frontmatter.paper).toLowerCase()) ? String(frontmatter.paper).toLowerCase() : undefined,
+    max_pages: Number(frontmatter.max_pages) > 0 ? Number(frontmatter.max_pages) : undefined,
     // Age penalty for the ranked list (lib/rank.mjs); missing → defaults.
     ranking: frontmatter.ranking && typeof frontmatter.ranking === 'object' ? frontmatter.ranking : {},
     // Links the resume itself points to (GitHub, personal site, LinkedIn, …).

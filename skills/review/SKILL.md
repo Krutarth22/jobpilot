@@ -58,22 +58,19 @@ tailored resume that passes the fact gate and an ATS round-trip.
    - **Missing keywords** — JD terms the resume vocabulary lacks *and* the profile genuinely supports (reformulated, never fabricated).
    - **Rewritten bullets** — for the 3–5 most relevant profile bullets: reframe and reorder for this JD. Show `before → after` so the user can audit every change against `profile.md`. Never let a rewrite strengthen a claim the self-check flagged `Needs clarification` or `Material inconsistency` (step 5's rule). Run them through the bullet lint (step 7) before showing.
 7. Ask whether to generate the tailored PDF. If yes:
-   - Fill `templates/resume.html` (copy it, replace the `{{PLACEHOLDER}}` fields) with profile facts + the rewritten bullets. Save the HTML in `<workspace>/out/`.
-   - **Fact gate BEFORE rendering** — this blocks the PDF on failure:
+   - Get the paths. Each job has its own folder; the PDF is named after the user (`Jordan-Rivera-Resume.pdf`), never the company, because recruiters see the file name and forward it. Paper size (Letter or A4) and the page limit come from the profile:
      ```sh
-     node "<pluginRoot>/scripts/check-resume.mjs" "<workspace>/out/resume-<company-slug>.html"
+     node "<pluginRoot>/scripts/review.mjs" paths <id>
      ```
-     Every number, date, company/title line and skill must trace to profile.md; the lint flags weak openings, over-2-line bullets, repeated verbs and lost metrics. If it fails, fix the HTML (or profile.md) and re-run — never render a failing resume.
-   - Render, then **ATS round-trip AFTER rendering**:
+   - Copy `templates/resume.html` to the `html` path and fill every placeholder with profile facts plus the rewritten bullets. Contact line: email, phone, location, and the `links` from the profile front matter (LinkedIn, GitHub, website). **Delete** a contact `<span>` the profile has no value for; never leave a placeholder or invent a link. Order roles newest first and each role's most relevant bullets first. Keep within `maxPages` (1 page under 10 years of experience, 2 from 10) by cutting the least relevant bullets, never by shrinking the font.
+   - Build it. One command runs the fact gate, renders the PDF, checks the layout, reads it back the way an ATS would, and scores it:
      ```sh
-     node "<pluginRoot>/scripts/render-resume.mjs" "<workspace>/out/resume-<company-slug>.html" "<workspace>/out/resume-<company-slug>.pdf"
-     node "<pluginRoot>/scripts/review.mjs" ats "<workspace>/out/resume-<company-slug>.pdf" "<workspace>/out/resume-<company-slug>.html"
+     node "<pluginRoot>/scripts/review.mjs" build <id>
      ```
-     This parses the PDF back the way an ATS would and checks headings, reading order and skill tokens survive. Fix the HTML if anything is lost.
-   - Score the tailored PDF and show **before → after** (e.g. "ATS score 68 → 91"), with anything still in its `fixes` list:
-     ```sh
-     node "<pluginRoot>/scripts/review.mjs" <id> --resume "<workspace>/out/resume-<company-slug>.pdf"
-     ```
-     Raise the score only with keywords from `keywordsYouCanAdd` — never with gaps.
-   - Save the critique next to them as `out/review-<id>-<company-slug>.md`.
-8. Report: the ATS score (before → after), the scorecard, the claim self-check findings, the PDF path, page count, the lint findings, and remind the user: every bullet is traceable to `profile.md` — tell me if anything reads wrong and I'll fix the source, not just the copy.
+     - **Exit 1 = blocked, no PDF.** Either a placeholder is unfilled or the fact gate failed: every number, date, company/title line and skill must trace to profile.md. Fix the HTML (or profile.md if the fact is real but missing) and build again. Never work around the gate.
+     - **Exit 3 = PDF written, needs a fix.** `problems` says what: too many pages (cut bullets), text running past the page edge (shorten the line), or text lost in ATS parsing. Fix and build again.
+     - **Exit 0 = ready.**
+   - **Look at the result.** Open every image in `previews` and check the page the way a recruiter would: nothing cut off, no heading stranded at the bottom of a page, the spacing even, and a second page (if any) more than a few lines long. Fix and rebuild if anything looks off. If you can't open images, tell the user to check the PDF themselves.
+   - Show the ATS score as **before → after** (`atsScore.before` → `atsScore.after`) with anything left in `fixes`. Raise the score only with keywords from `keywordsYouCanAdd`, never with gaps. Also pass along the bullet lint suggestions in `factGate.lint`; they're optional.
+   - Save the critique at the `notes` path.
+8. Report: the ATS score (before → after), the scorecard, the claim self-check findings, the PDF path with its paper size and page count, the lint findings, and remind the user: every bullet is traceable to `profile.md` — tell me if anything reads wrong and I'll fix the source, not just the copy.

@@ -10,7 +10,7 @@
 // judgment call — "is the domain recognizable" — is left to the skill's AI),
 // and the ATS round-trip on the rendered PDF.
 
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import {
   workspaceRoot, findJob, readEval,
 } from './lib/workspace.mjs';
@@ -20,7 +20,9 @@ import { extractSkills, extractTerms } from './lib/skills.mjs';
 import { atsScore } from './lib/ats.mjs';
 import { jdSkillList, extractLevel, levelDistance } from './lib/signals.mjs';
 import { fetchDescription } from './jobs.mjs';
-import { htmlToLines } from './check-resume.mjs';
+import { htmlToLines, checkResumeFile } from './check-resume.mjs';
+import { renderHtmlToPdf } from './render-resume.mjs';
+import { tailoredPaths } from './lib/resume-output.mjs';
 import { extractText, extractDocument } from './parse-resume.mjs';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -221,6 +223,54 @@ async function scoreFile(file, ctx) {
   return atsScore({ ...ctx, text, pages, fileName: file });
 }
 
+/**
+ * Build a tailored resume from the HTML the review skill wrote: fact gate →
+ * render (paper and page limit from the profile) → layout check → ATS
+ * round-trip → ATS score before and after. One call, one JSON report.
+ * Exit 1: blocked (unfilled placeholders or the fact gate failed — no PDF).
+ * Exit 3: PDF written but needs a fix (too long, text off the page, or text
+ * lost in ATS parsing).
+ */
+export async function buildTailored(root, job, { profile, profileBody, jdText = '', checklist = null }) {
+  const paths = tailoredPaths(root, job, profile);
+  if (!existsSync(paths.html)) {
+    return { status: 1, error: `write the tailored HTML to ${paths.html} first (copy templates/resume.html)`, paths };
+  }
+  const html = await readFile(paths.html, 'utf8');
+  const unfilled = [...new Set(html.match(/\{\{[A-Z_]+\}\}/g) || [])];
+  if (unfilled.length) {
+    return { status: 1, error: `unfilled placeholders: ${unfilled.join(', ')} — fill them, or delete the element when the profile has no value`, paths };
+  }
+  const factGate = await checkResumeFile(root, paths.html);
+  if (!factGate.ok) return { status: 1, error: 'fact gate failed — no PDF rendered', factGate, paths };
+
+  await rm(paths.previewDir, { recursive: true, force: true }); // no stale pages
+  const render = await renderHtmlToPdf(html, paths.pdf, { format: paths.paper, previewDir: paths.previewDir });
+  const roundTrip = await atsRoundTrip(paths.pdf, paths.html);
+  const ctx = { jdText, checklist, jobTitle: job.title, profile, profileBody };
+  const original = originalResumePath(root);
+  const atsBefore = original ? await scoreFile(original, ctx) : null;
+  const atsAfter = await scoreFile(paths.pdf, ctx);
+
+  const problems = [];
+  if (render.pages > paths.maxPages) problems.push(`${render.pages} pages, limit is ${paths.maxPages}: trim the least relevant bullets`);
+  for (const text of render.overflow) problems.push(`runs past the page edge: "${text}"`);
+  for (const v of roundTrip.violations) problems.push(v);
+  return {
+    status: problems.length ? 3 : 0,
+    pdf: paths.pdf,
+    paper: paths.paper,
+    pages: render.pages,
+    maxPages: paths.maxPages,
+    previews: render.previews,
+    problems,
+    factGate: { ok: true, lint: factGate.lint, claimWarnings: factGate.claimWarnings },
+    roundTrip,
+    atsScore: { before: atsBefore?.score ?? null, after: atsAfter.score, fixes: atsAfter.fixes, keywordsYouCanAdd: atsAfter.keywordsYouCanAdd },
+    notes: paths.notes,
+  };
+}
+
 async function main(argv) {
   const [cmd, ...rest] = argv;
   const root = workspaceRoot();
@@ -231,6 +281,24 @@ async function main(argv) {
     const result = await atsRoundTrip(pdfPath, htmlPath);
     console.log(JSON.stringify(result, null, 2));
     process.exit(result.ok ? 0 : 1);
+  }
+
+  if (cmd === 'paths' || cmd === 'build') {
+    const [jobId] = rest;
+    if (!jobId) { console.error(`Usage: review.mjs ${cmd} <id>`); process.exit(1); }
+    const job = findJob(root, jobId);
+    if (!job) { console.error(`no job matching "${jobId}" in jobs.csv`); process.exit(1); }
+    const { profile, body: profileBody } = loadProfile(root);
+    if (cmd === 'paths') {
+      console.log(JSON.stringify(tailoredPaths(root, job, profile), null, 2));
+      return;
+    }
+    let jdText = '';
+    try { jdText = await fetchDescription(root, job); } catch { /* keywords part of the ATS score is skipped */ }
+    const result = await buildTailored(root, job, { profile, profileBody, jdText, checklist: readEval(root, job.id)?.checklist });
+    const { status, ...report } = result;
+    console.log(JSON.stringify(report, null, 2));
+    process.exit(status);
   }
 
   if (cmd === 'ats-score') {
@@ -250,7 +318,7 @@ async function main(argv) {
 
   const id = cmd;
   if (!id) {
-    console.error('Usage: node review.mjs <id> [--resume out/tailored.pdf] | ats <pdf> <html> | ats-score <id> [resume]');
+    console.error('Usage: node review.mjs <id> [--resume out/tailored.pdf] | ats <pdf> <html> | ats-score <id> [resume] | paths <id> | build <id>');
     process.exit(1);
   }
   const job = findJob(root, id);

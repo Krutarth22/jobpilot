@@ -37,6 +37,8 @@ generates traces back to `profile.md` — build it carefully.
    - **Front matter (the machine layer — scorers read exactly these fields):**
      ```yaml
      ---
+     name: Jordan Rivera       # as on the resume; names the tailored PDF file
+     paper: letter             # letter in the US/Canada, a4 elsewhere
      years_experience: 11
      level: manager            # ic-mid | ic-senior | staff | principal | manager | senior-manager | director
      target_titles: [Engineering Manager, Senior Backend Engineer]
@@ -53,6 +55,7 @@ generates traces back to `profile.md` — build it carefully.
      ---
      ```
      `experience` copies titles, companies and dates exactly as the resume states them (`YYYY-MM`, or `present`); leave a date out rather than guess it. A field the user didn't answer stays OUT of the front matter — a missing field scores "unknown" (neutral), never guessed. `multipliers` estimate total comp from posted base (by `level@company-stage`; stage comes from the companies.yml entry or your explicit note).
+     `paper` follows where the user applies: `letter` for the US and Canada, `a4` everywhere else. Add `max_pages: 2` only if the user asks; by default tailored resumes are 1 page under 10 years of experience and 2 pages from 10 years.
      `links` records only the URLs the resume itself lists (GitHub, personal site, LinkedIn, anything else in `other`) — never invent or look one up. A missing link is not a red flag: the review skill's claim self-check marks anything depending on it "Not assessable", never adverse.
    - **Prose (the human layer):** facts (experience with original metrics, education, certifications), then targets — infer 5–10 target titles, a seniority band, and a preferred location/remote policy from the resume's trajectory, under a `<!-- inferred: confirm with user -->` heading. Facts and inferences must be visually separate.
    - **Deal-breakers:** ask the user (min salary, exclusions, visa, clearance, languages). Leave what they don't answer out rather than guessing.
