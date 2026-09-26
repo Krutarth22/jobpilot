@@ -14,6 +14,9 @@ export function feedbackRows(evals) {
     const comps = ev?.score?.components;
     const hasAnyScore = comps && Object.values(comps).some((c) => c && Number.isFinite(c.pct));
     if (!fb?.user_score || !hasAnyScore) continue;
+    // A knocked-out job's fit was capped, not computed from the weights —
+    // learning from it would teach the weights the cap.
+    if (ev.score?.capped) continue;
     const pct = (key) => {
       const c = comps[key];
       return c && Number.isFinite(c.pct) ? c.pct / 100 : 0.5; // null → neutral
@@ -38,6 +41,7 @@ export function feedbackRows(evals) {
 // ── D2: constrained least squares ───────────────────────────────────────
 
 const KEYS = ['skills', 'seniority', 'domain', 'location', 'comp'];
+export const RIDGE_LAMBDA = 2;
 
 function predict(row, w) {
   let s = 0;
@@ -52,10 +56,12 @@ function mae(rows, w) {
 
 /**
  * Fit the 5 weights (non-negative, sum 100) minimizing the gap between the
- * predicted fit and the user's scores. Unconstrained normal equations via
- * Gaussian elimination, then projected (clip to ≥0, renormalize) until stable
- * — deterministic, and 5 dimensions make the projection converge immediately.
- * With no rows, returns the current weights unchanged.
+ * predicted fit and the user's scores. Ridge-regularized TOWARD THE CURRENT
+ * WEIGHTS: with ten-ish feedback rows and five weights, plain least squares
+ * swings wildly on noise; the penalty keeps a proposal close to what the user
+ * already has unless the data clearly says otherwise, and fades as rows grow.
+ * Solved by Gaussian elimination, then projected (clip to ≥0, renormalize)
+ * until stable — deterministic. With <3 rows, returns the current weights.
  * @param {Array} rows feedbackRows() output
  * @param {object} currentWeights the profile's weights (fallback/floor)
  */
@@ -83,8 +89,11 @@ export function fitWeights(rows, currentWeights = {}) {
       for (let j = 0; j < n; j++) ata[i][j] += x[i] * x[j];
     }
   }
-  // Tikhonov nudge for collinear columns (e.g. two signals always equal).
-  for (let i = 0; i < n; i++) ata[i][i] += 1e-6;
+  // Ridge toward the current weights: (AᵀA + λI) w = Aᵀb + λ·current.
+  for (let i = 0; i < n; i++) {
+    ata[i][i] += RIDGE_LAMBDA;
+    atb[i] += RIDGE_LAMBDA * current[KEYS[i]];
+  }
 
   // Gaussian elimination with partial pivoting.
   const m = ata.map((row, i) => [...row, atb[i]]);
@@ -153,6 +162,12 @@ export function suggestPreferences(rows, { minCount = 3 } = {}) {
 
 export const MIN_OUTCOMES_FOR_HEALTH = 15;
 
+// A bucket needs this many outcomes before its rate is compared: an empty or
+// one-row bucket says nothing about calibration.
+export const MIN_BUCKET_OUTCOMES = 3;
+// An offer means the interviews happened.
+const REACHED_INTERVIEW = new Set(['interview', 'offer']);
+
 /** Interview rate by fit bucket (80+, 60–79, <60). */
 export function statsByBucket(jobs) {
   const buckets = {
@@ -165,7 +180,7 @@ export function statsByBucket(jobs) {
     if (!Number.isFinite(fit) || !job.outcome) continue;
     const bucket = fit >= 80 ? '80+' : fit >= 60 ? '60-79' : '<60';
     buckets[bucket].applied++;
-    if (job.outcome === 'interview') buckets[bucket].interview++;
+    if (REACHED_INTERVIEW.has(job.outcome)) buckets[bucket].interview++;
   }
   const total = Object.values(buckets).reduce((a, b) => a + b.applied, 0);
   const result = { buckets, totalOutcomes: total, healthy: null };
@@ -173,7 +188,12 @@ export function statsByBucket(jobs) {
     const rates = Object.fromEntries(Object.entries(buckets).map(([k, b]) => [k, b.applied > 0 ? b.interview / b.applied : null]));
     // Miscalibrated: the top bucket's interview rate is not the highest.
     result.rates = Object.fromEntries(Object.entries(rates).map(([k, v]) => [k, v === null ? null : Math.round(v * 100) / 100]));
-    result.healthy = (rates['80+'] ?? 0) >= (rates['60-79'] ?? 0) && (rates['60-79'] ?? 0) >= (rates['<60'] ?? 0);
+    // Higher buckets must convert at least as well as lower ones — compared
+    // only across buckets with enough outcomes to mean something.
+    const ordered = ['80+', '60-79', '<60']
+      .filter((k) => buckets[k].applied >= MIN_BUCKET_OUTCOMES)
+      .map((k) => rates[k]);
+    result.healthy = ordered.length < 2 ? null : ordered.every((r, i) => i === 0 || ordered[i - 1] >= r);
   }
   return result;
 }

@@ -32,17 +32,24 @@ export function roleTokens(title) {
 }
 
 /**
- * Fuzzy title match: 2+ overlapping significant tokens, or 1 when both titles
- * are tiny. Seniority words are ignored — "Senior X" vs "X" is the classic
- * repost pattern, not a different opening.
+ * Fuzzy title match — "the same opening, re-listed". Seniority words are
+ * ignored ("Senior X" vs "X" is the classic repost). Then either one title's
+ * significant tokens are all contained in the other's ("Software Engineer,
+ * Payments" ⊂ "Software Engineer, Payments Platform"), or the two overlap by
+ * ≥80% (Jaccard). Sharing a couple of words is NOT enough: "Manager, Software
+ * Engineering – Billing" and "… – Data Platform" are sibling openings.
  */
+export const REPOST_JACCARD = 0.8;
+
 export function titleFuzzyMatch(a, b) {
-  const ta = roleTokens(a);
-  const tb = roleTokens(b);
-  if (ta.length === 0 || tb.length === 0) return false;
-  const overlap = ta.filter((t) => tb.includes(t)).length;
-  const minTokens = Math.min(ta.length, tb.length);
-  return overlap >= (minTokens === 1 ? 1 : 2);
+  const ta = new Set(roleTokens(a));
+  const tb = new Set(roleTokens(b));
+  if (ta.size === 0 || tb.size === 0) return false;
+  const overlap = [...ta].filter((t) => tb.has(t)).length;
+  const [small, large] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
+  const contained = overlap === small.size && (small.size >= 2 || large.size === 1);
+  const jaccard = overlap / (ta.size + tb.size - overlap);
+  return contained || jaccard >= REPOST_JACCARD;
 }
 
 const COMPANY_SUFFIXES = /\b(inc|llc|ltd|corp|corporation|company|co|gmbh|ag|bv|pty|plc|holdings|group|labs?|technologies|technology|software|solutions)\b\.?/gi;

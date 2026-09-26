@@ -46,9 +46,12 @@ generates traces back to `profile.md` — build it carefully.
      comp: { currency: USD, min_total: 350000, multipliers: { "manager@public": 1.6, default: 1.4 } }
      deal_breakers: { onsite_only: false, needs_sponsorship: false, clearance: false }
      weights: { skills: 35, seniority: 25, domain: 15, location: 15, comp: 10 }
+     experience:               # newest first; review's 30-second screen reads this
+       - { title: Engineering Manager, company: Acme, start: 2019-03, end: present }
+       - { title: Senior Engineer, company: Globex, start: 2015-06, end: 2019-02 }
      ---
      ```
-     A field the user didn't answer stays OUT of the front matter — a missing field scores "unknown" (neutral), never guessed. `multipliers` estimate total comp from posted base (by `level@company-stage`; stage comes from the companies.yml entry or your explicit note).
+     `experience` copies titles, companies and dates exactly as the resume states them (`YYYY-MM`, or `present`); leave a date out rather than guess it. A field the user didn't answer stays OUT of the front matter — a missing field scores "unknown" (neutral), never guessed. `multipliers` estimate total comp from posted base (by `level@company-stage`; stage comes from the companies.yml entry or your explicit note).
    - **Prose (the human layer):** facts (experience with original metrics, education, certifications), then targets — infer 5–10 target titles, a seniority band, and a preferred location/remote policy from the resume's trajectory, under a `<!-- inferred: confirm with user -->` heading. Facts and inferences must be visually separate.
    - **Deal-breakers:** ask the user (min salary, exclusions, visa, clearance, languages). Leave what they don't answer out rather than guessing.
    - **Scan filters:** rewrite `title_filter` and `location_filter` in `companies.yml` from the confirmed targets. Companies word titles differently ("Engineering Manager" vs "Manager, Software Engineering"), so write word-order variants as AND-groups — `manager + engineering` matches both. Add `negative` terms for look-alikes the user doesn't want (e.g. `sales`, `recruiter`, `intern`).

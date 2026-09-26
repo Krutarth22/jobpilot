@@ -30,14 +30,29 @@ function loadAllEvals(root) {
     .filter(Boolean);
 }
 
-/** Rewrite profile.md with new weights (front matter re-emitted, body untouched). */
+/** The front matter with its `weights:` entry replaced — everything else
+ * (comments, key order, flow style) kept as written. Returns null when the
+ * weights entry isn't a single line we can swap safely. */
+export function replaceWeightsLine(text, weights) {
+  const fm = String(text).match(/^(---[ \t]*\r?\n)([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n|$))/);
+  if (!fm) return null;
+  const line = `weights: ${yaml.dump(weights, { flowLevel: 0, lineWidth: -1 }).trim().replace(/^\{/, '{ ').replace(/\}$/, ' }')}`;
+  const lines = fm[2].split(/\r?\n/);
+  const at = lines.findIndex((l) => /^weights\s*:/.test(l));
+  if (at === -1) lines.push(line);
+  else if (/^weights\s*:\s*\{.*\}\s*(#.*)?$/.test(lines[at])) lines[at] = line;
+  else return null; // block-style weights: let the caller fall back
+  return `${fm[1]}${lines.join('\n')}${fm[3]}${text.slice(fm[0].length)}`;
+}
+
+/** Update profile.md's weights (a backup is kept). */
 export async function writeWeights(root, weights) {
   const file = profilePath(root);
   const text = await readFile(file, 'utf8');
   const { frontmatter, body, hasFrontmatter } = parseProfile(text);
   if (!hasFrontmatter) throw new Error('profile.md has no front matter to update — run setup first');
-  const fm = { ...frontmatter, weights };
-  const out = `---\n${yaml.dump(fm, { lineWidth: 120 }).trimEnd()}\n---\n\n${body}\n`;
+  const out = replaceWeightsLine(text, weights)
+    ?? `---\n${yaml.dump({ ...frontmatter, weights }, { lineWidth: 120 }).trimEnd()}\n---\n\n${body}\n`;
   await rename(file, `${file}.bak`);
   await writeFile(file, out);
   return `${file}.bak`;

@@ -166,3 +166,114 @@ test('#15 name matching is word-level ("Ramp" never matches "Rampart" or "trampo
   assert.equal(await boardMatchesName('lever', 'ramp', 'Ramp', [{ description: 'Ramp is building finance software.' }]), true);
   assert.equal(await boardMatchesName('greenhouse', 'ramp', 'Ramp Inc', [], { fetchBoardName: async () => 'Ramp' }), true);
 });
+
+// ── Phases B–E review ───────────────────────────────────────────────────
+
+test('B: sibling openings are not reposts; re-listed and sub-team titles are', async () => {
+  const { titleFuzzyMatch, findReposts } = await import('../scripts/lib/repost.mjs');
+  assert.equal(titleFuzzyMatch('Manager, Software Engineering - Billing', 'Manager, Software Engineering - Data Platform'), false);
+  assert.equal(titleFuzzyMatch('Senior Backend Engineer, Payments', 'Frontend Engineer, Payments'), false);
+  assert.equal(titleFuzzyMatch('Senior Backend Engineer', 'Backend Engineer'), true);
+  assert.equal(titleFuzzyMatch('Software Engineer - Payments', 'Software Engineer, Payments Platform'), true);
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = [
+    { id: '1', company: 'Figma', title: 'Manager, Software Engineering - Billing', url: 'u1', found: today },
+    { id: '2', company: 'Figma', title: 'Manager, Software Engineering - Data Platform', url: 'u2', found: today },
+  ];
+  assert.equal(findReposts({ company: 'Figma', title: 'Manager, Software Engineering - Growth Platform', url: 'u3' }, rows).count, 0);
+});
+
+test('B: the sweep rotates through rows and downloads each board once', async () => {
+  const { pickCandidates, memoizedFetchJson } = await import('../scripts/lib/sweep.mjs');
+  const jobs = ['1', '2', '3'].map((id) => ({ id, status: 'new', found: `2026-09-0${id}` }));
+  // #1 and #2 were checked last sweep, so #3 (never checked) goes first.
+  const picked = pickCandidates(jobs, { 1: '2026-09-25', 2: '2026-09-24' }, { limit: 2, statuses: ['new'] });
+  assert.deepEqual(picked.map((j) => j.id), ['3', '2']);
+  let calls = 0;
+  const once = memoizedFetchJson(async () => { calls++; return { jobs: [] }; });
+  await once('https://api.ashbyhq.com/posting-api/job-board/ramp');
+  await once('https://api.ashbyhq.com/posting-api/job-board/ramp');
+  assert.equal(calls, 1);
+});
+
+test('C: weak openings are caught behind a bullet marker; style never blocks render', async () => {
+  const { lintBullets, auditResume } = await import('../scripts/check-resume.mjs');
+  assert.ok(lintBullets(['• Responsible for the payments API']).some((f) => f.issue === 'weak opening'));
+  const audit = auditResume({
+    tailoredText: 'Led the migration of 3 services', bullets: ['• Led the migration of 3 services', '• Led hiring'],
+    profileText: 'Led the migration of 3 services. Led hiring.',
+  });
+  assert.equal(audit.ok, true);
+  assert.ok(audit.lint.length > 0);
+});
+
+test('C: a metric needs the same number AND the same kind of unit', async () => {
+  const { auditResume } = await import('../scripts/check-resume.mjs');
+  const profileText = 'Managed a team of 40 engineers. Cut latency 30 percent. Raised $2M. Scaled to 1,200 users.';
+  const bad = auditResume({ tailoredText: 'Cut costs 40%', profileText });
+  assert.deepEqual(bad.violations, ['metric "40%" not in profile.md']);
+  const good = auditResume({ tailoredText: 'Cut latency 30%, raised $2 million, 1200 users, 40 engineers', profileText });
+  assert.deepEqual(good.violations, []);
+});
+
+test('C: every segment of a role line must trace to the profile', async () => {
+  const { auditResume } = await import('../scripts/check-resume.mjs');
+  const profileText = 'Engineering Manager at Acme, New York, 2019-2026';
+  const audit = auditResume({ tailoredText: '2019', roleLines: ['Acme · Berlin', 'Globex · New York'], profileText });
+  assert.deepEqual(audit.violations, ['"berlin" in role line not in profile.md', '"globex" in role line not in profile.md']);
+});
+
+test('D: few noisy ratings cannot swing the weights far from the current ones', async () => {
+  const { fitWeights } = await import('../scripts/lib/learn.mjs');
+  const current = { skills: 35, seniority: 25, domain: 15, location: 15, comp: 10 };
+  // Ten ratings that are pure noise with respect to the components.
+  const noise = [55, 80, 40, 90, 35, 70, 60, 85, 45, 65];
+  const rows = noise.map((u, i) => ({
+    id: i, userScore: u, why: '', outcome: '',
+    components: { skills: 0.5 + (i % 2) * 0.1, seniority: 0.6, domain: 0.5, location: 0.7 + (i % 3) * 0.1, comp: 0.5 },
+  }));
+  const fit = fitWeights(rows, current);
+  for (const k of Object.keys(current)) {
+    assert.ok(Math.abs(fit.weights[k] - current[k]) <= 20, `${k} swung to ${fit.weights[k]}`);
+  }
+});
+
+test('D: knocked-out jobs are not learned from', async () => {
+  const { feedbackRows } = await import('../scripts/lib/learn.mjs');
+  const comps = { skills: { pct: 80 }, seniority: { pct: 80 }, domain: { pct: 50 }, location: { pct: 90 }, comp: { pct: null } };
+  const rows = feedbackRows([
+    { id: '1', feedback: { user_score: 30 }, score: { components: comps, capped: true } },
+    { id: '2', feedback: { user_score: 70 }, score: { components: comps, capped: false } },
+  ]);
+  assert.deepEqual(rows.map((r) => r.id), ['2']);
+});
+
+test('D: writing weights keeps the rest of the front matter as written', async () => {
+  const { replaceWeightsLine } = await import('../scripts/learn.mjs');
+  const text = '---\nlevel: manager   # my level\nweights: { skills: 35, seniority: 25, domain: 15, location: 15, comp: 10 }\nlocations: { remote: preferred }\n---\n\n## Experience\n';
+  const out = replaceWeightsLine(text, { skills: 40, seniority: 20, domain: 15, location: 15, comp: 10 });
+  assert.equal(out, '---\nlevel: manager   # my level\nweights: { skills: 40, seniority: 20, domain: 15, location: 15, comp: 10 }\nlocations: { remote: preferred }\n---\n\n## Experience\n');
+});
+
+test('D: offers count as interviews; an empty bucket is not "miscalibrated"', async () => {
+  const { statsByBucket } = await import('../scripts/lib/learn.mjs');
+  const offers = statsByBucket(Array.from({ length: 15 }, () => ({ fit: '85', outcome: 'offer' })));
+  assert.equal(offers.buckets['80+'].interview, 15);
+  const noTopBucket = [
+    ...Array.from({ length: 10 }, (_, i) => ({ fit: '70', outcome: i < 3 ? 'interview' : 'rejected' })),
+    ...Array.from({ length: 6 }, (_, i) => ({ fit: '40', outcome: i < 1 ? 'interview' : 'rejected' })),
+  ];
+  assert.equal(statsByBucket(noTopBucket).healthy, true);
+});
+
+test('D/E: outcome marks the job applied; eval refuses score/checklist keys', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { writeJobs } = await import('../scripts/lib/workspace.mjs');
+  const root = mkdtempSync(join(tmpdir(), 'jobpilot-cli-'));
+  writeJobs(root, [{ id: '1', company: 'Acme', title: 'EM', url: 'https://a/1', status: 'new' }]);
+  const run = (...args) => execFileSync('node', ['scripts/jobs.mjs', ...args], { env: { ...process.env, JOBPILOT_HOME: root }, encoding: 'utf8', stdio: 'pipe' });
+  run('outcome', '1', 'rejected');
+  assert.match(run('show', '1'), /status\s+: applied/);
+  assert.throws(() => run('eval', '1', 'score', '{"fit": 99}'));
+  run('eval', '1', 'contact', '{"name": "Jane"}');
+});

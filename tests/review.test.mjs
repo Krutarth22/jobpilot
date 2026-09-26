@@ -5,7 +5,7 @@ import { mustHaveCoverage, keywordCoverage, thirtySecondScreen, atsRoundTrip, mu
 
 const PROFILE = `
 ## Experience
-Led the platform team at Acme Corp from 2019 to 2024. Cut p99 latency 40 percent by rebuilding the ingestion pipeline serving 2 million users.
+Led the platform team at Acme Corp (Berlin) from 2019 to 2024. Cut p99 latency 40 percent by rebuilding the ingestion pipeline serving 2 million users.
 - Grew the team from 4 to 11 engineers
 - Owned the Kubernetes migration, 30 services
 ## Skills

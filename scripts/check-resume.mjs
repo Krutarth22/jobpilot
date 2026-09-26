@@ -5,8 +5,9 @@
 //   node check-resume.mjs <tailored.html|tailored.pdf> [--resume out/file.html]
 //
 // Every number, date, company/title line and skill in the tailored resume
-// must trace to profile.md. Anything that fails is listed; a non-zero exit
-// blocks PDF rendering (the review skill runs this BEFORE render).
+// must trace to profile.md. A fact violation exits non-zero and blocks PDF
+// rendering (the review skill runs this BEFORE render). Bullet-lint findings
+// are style advice: reported, never blocking.
 //
 // Idea adapted from career-ops verify-cv-facts.mjs (MIT).
 
@@ -39,15 +40,39 @@ export function htmlToLines(html) {
     .split('\n').map((l) => l.trim()).filter(Boolean);
 }
 
-function extractMetrics(text) {
-  // Numbers worth tracing: percentages, money, multipliers, counts with a
-  // unit word. Bare years are handled separately as dates.
+// Unit classes: a claim only traces to the profile when the SAME number
+// appears with the SAME kind of unit. "Cut costs 40%" must not be vouched
+// for by "a team of 40 engineers".
+const UNIT_CLASS = {
+  '%': 'pct', percent: 'pct', x: 'x',
+  ms: 'ms', hr: 'time', hrs: 'time', hour: 'time', hours: 'time',
+  day: 'days', days: 'days', week: 'weeks', weeks: 'weeks', month: 'months', months: 'months',
+  users: 'count', customers: 'count', engineers: 'count', people: 'count', repo: 'count', repos: 'count', services: 'count', teams: 'count',
+};
+const MAGNITUDE = { k: 1e3, m: 1e6, b: 1e9, million: 1e6, billion: 1e9 };
+
+function toValue(raw, magnitude) {
+  const n = Number(String(raw).replace(/,/g, ''));
+  return Number.isFinite(n) ? Math.round(n * (MAGNITUDE[String(magnitude || '').toLowerCase()] || 1) * 1000) / 1000 : null;
+}
+
+/** Metric claims as canonical "class:value" keys ("pct:40", "money:2000000"). */
+export function extractMetrics(text) {
   const clean = foldDigits(text);
-  const claims = new Set();
-  for (const m of clean.matchAll(/(\d[\d,.]*)\s*(?:%|percent|x\b|k\b|m\b|ms\b|hrs?\b|hours?\b|days?\b|weeks?\b|months?\b|users\b|customers\b|engineers\b|people\b|repos?\b|services\b|teams\b|million\b|billion\b)/gi)) {
-    claims.add(m[0].toLowerCase().replace(/[.,]$/, ''));
+  const claims = new Map(); // key → the phrase as written
+  for (const m of clean.matchAll(/[$€£]\s?(\d[\d,]*(?:\.\d+)?)\s?(k|m|b|million|billion)?\b/gi)) {
+    const v = toValue(m[1], m[2]);
+    if (v !== null) claims.set(`money:${v}`, m[0].trim());
   }
-  for (const m of clean.matchAll(/[$€£]\s?\d[\d,.]*\s?[kmb]?/gi)) claims.add(m[0].toLowerCase().replace(/[.,]$/, ''));
+  for (const m of clean.matchAll(/(?<![$€£\d.,])(\d[\d,]*(?:\.\d+)?)\s*(k|m|million|billion)?\s*(%|percent|x\b|ms\b|hrs?\b|hours?\b|days?\b|weeks?\b|months?\b|users\b|customers\b|engineers\b|people\b|repos?\b|services\b|teams\b)/gi)) {
+    const v = toValue(m[1], m[2]);
+    const unit = UNIT_CLASS[m[3].toLowerCase()];
+    if (v !== null && unit) claims.set(`${unit}:${v}`, m[0].trim());
+  }
+  for (const m of clean.matchAll(/(?<![$€£\d.,])(\d[\d,]*(?:\.\d+)?)\s*(k|million|billion)\b(?!\s*(?:%|percent|x\b|ms\b|hrs?\b|hours?\b|days?\b|weeks?\b|months?\b|users\b|customers\b|engineers\b|people\b|repos?\b|services\b|teams\b))/gi)) {
+    const v = toValue(m[1], m[2]);
+    if (v !== null) claims.set(`num:${v}`, m[0].trim());
+  }
   return claims;
 }
 
@@ -60,8 +85,11 @@ function extractDates(text) {
 const WEAK_OPENINGS = /^(?:responsible for|worked on|worked with|helped(?: with| to)?|involved in|assisted (?:with|in)|tasked with|duties included|participated in|in charge of|was part of)\b/i;
 const MAX_BULLET_CHARS = 190; // ~2 lines at 10.5pt across 7in
 
-export function lintBullets(bullets, profileBullets = []) {
+const stripMarker = (line) => String(line).replace(/^\s*[•\-*]\s+/, '');
+
+export function lintBullets(rawBullets, profileBullets = []) {
   const findings = [];
+  const bullets = rawBullets.map(stripMarker); // "• Responsible for…" must still read as a weak opening
   const openings = new Map();
   const profileMetricRatio = profileBullets.length > 0
     ? profileBullets.filter((b) => /\d/.test(b)).length / profileBullets.length
@@ -103,23 +131,20 @@ export function auditResume({ tailoredText, roleLines = [], bullets = [], profil
   for (const year of extractDates(tailoredText)) {
     if (!profile.includes(year)) violations.push(`date ${year} not in profile.md`);
   }
-  // 2. Every metric-like claim appears in the profile (folded, normalized):
-  // the exact phrasing, or at least the bare number with word boundaries.
+  // 2. Every metric claim appears in the profile as the same number with the
+  // same kind of unit (see extractMetrics).
   const profileMetrics = extractMetrics(profileText);
-  for (const claim of extractMetrics(tailoredText)) {
-    const numeric = claim.match(/\d[\d,.]*/)?.[0] ?? '';
-    const inProfile = profileMetrics.has(claim)
-      || new RegExp(`\\b${numeric.replace(/[.,]/g, '')}\\b`).test(foldDigits(profileText));
-    if (!inProfile) violations.push(`metric "${claim}" not in profile.md`);
+  for (const [key, phrase] of extractMetrics(tailoredText)) {
+    if (!profileMetrics.has(key)) violations.push(`metric "${phrase}" not in profile.md`);
   }
-  // 3. Company/title lines (the role headings): the company segment must
-  // trace to the profile; date segments are covered by the date check and
-  // the posting city is presentation, not a claim.
+  // 3. Role lines ("Title · Company · Location · 2019–2026"): every text
+  // segment — title, company, location — must trace to the profile. Date
+  // segments are covered by the date check.
   for (const line of roleLines) {
-    const segments = line.split('·').map((s) => norm(s)).filter(Boolean);
-    const company = segments[0];
-    if (company && !/\d/.test(company) && !profile.includes(company)) {
-      violations.push(`"${company}" in role line not in profile.md`);
+    for (const segment of line.split(/[·|]/).map((s) => norm(s)).filter(Boolean)) {
+      if (!/\d/.test(segment) && !profile.includes(segment)) {
+        violations.push(`"${segment}" in role line not in profile.md`);
+      }
     }
   }
   // 4. Every skill is known to the profile (front matter or prose).
@@ -129,7 +154,8 @@ export function auditResume({ tailoredText, roleLines = [], bullets = [], profil
   }
 
   const lint = lintBullets(bullets, (profileText.match(/^\s*[•\-*]\s+(.+)$/gm) || []));
-  return { ok: violations.length === 0 && lint.length === 0, violations, lint };
+  // Only facts gate the render; lint is advice the user can take or leave.
+  return { ok: violations.length === 0, violations, lint };
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────
@@ -157,10 +183,11 @@ async function main(argv) {
   const audit = auditResume({ tailoredText: tailored, roleLines, bullets, profileText });
   console.log(JSON.stringify({ ok: audit.ok, violations: audit.violations, lint: audit.lint }, null, 2));
   if (!audit.ok) {
-    console.error(`❌ fact gate FAILED: ${audit.violations.length} violation(s), ${audit.lint.length} lint finding(s). Fix the source (profile.md) or the bullet — do not render.`);
+    console.error(`❌ fact gate FAILED: ${audit.violations.length} violation(s). Fix the source (profile.md) or the bullet — do not render.`);
     process.exit(1);
   }
   console.error('✅ fact gate passed: every number, date, company/title and skill traces to profile.md');
+  if (audit.lint.length > 0) console.error(`✏️  ${audit.lint.length} style suggestion(s) from the bullet lint — optional.`);
 }
 
 if (isMainModule(import.meta.url)) {

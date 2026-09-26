@@ -29,6 +29,9 @@ import * as ashby from './providers/ashby.mjs';
 
 const PROVIDERS = { greenhouse, lever, ashby };
 
+// Keys `jobs.mjs eval` may write into evals/<id>.json.
+export const EVAL_KEYS = ['contact'];
+
 const usage = (msg) => {
   if (msg) console.error(`⚠️  ${msg}`);
   console.error('Usage: jobs.mjs <list|show|get|score|status|note|sweep|feedback|outcome|stats|eval> ...');
@@ -208,13 +211,18 @@ async function main(argv) {
     const outcome = rest[1];
     if (!OUTCOMES.includes(outcome)) usage(`outcome must be one of: ${OUTCOMES.join(', ')}`);
     updateJobs(root, job.id, { outcome });
-    if (outcome === 'interview' && job.status === 'new') updateJobs(root, job.id, { status: 'applied' });
+    // Any outcome means an application went in (you can't be rejected or
+    // ghosted by a company you never applied to).
+    if (job.status === 'new') updateJobs(root, job.id, { status: 'applied' });
   } else if (cmd === 'eval') {
     // E1: store non-score data (e.g. contact notes) in evals/<id>.json.
     //   jobs.mjs eval <id> contact '{"name": "...", "confidence": "..."}'
+    // Only free-form annotations: checklist/score/feedback have their own
+    // validated writers (score.mjs, feedback) and must not be overwritten here.
     const key = rest[1];
     const raw = rest.slice(2).join(' ').trim();
     if (!key || !raw) usage('eval needs a key and JSON, e.g. eval 12 contact \'{"name":"Jane"}\'');
+    if (!EVAL_KEYS.includes(key)) usage(`eval key must be one of: ${EVAL_KEYS.join(', ')} (scores go through score.mjs, ratings through feedback)`);
     let value;
     try { value = JSON.parse(raw); } catch { usage('eval value must be valid JSON'); }
     const ev = readEval(root, job.id) || { id: job.id, company: job.company, title: job.title, url: job.url };

@@ -173,8 +173,15 @@ export async function atsRoundTrip(pdfPath, htmlPath) {
   for (const h of hs) {
     if (!pdfNorm.includes(norm(h))) violations.push(`heading "${h}" lost in PDF extraction`);
   }
-  // 2. Reading order holds (no columns tearing the flow apart).
-  const positions = hs.map((h) => pdfNorm.indexOf(norm(h))).filter((p) => p >= 0);
+  // 2. Reading order holds (no columns tearing the flow apart). A heading is
+  // located as its own line where possible — "Experience" also appears in
+  // sentences ("10 years of experience") that come before the heading.
+  const pdfLines = pdfText.split('\n').map(norm);
+  const positionOf = (h) => {
+    const line = pdfLines.indexOf(norm(h));
+    return line >= 0 ? line : pdfLines.findIndex((l) => l.includes(norm(h)));
+  };
+  const positions = hs.map(positionOf).filter((p) => p >= 0);
   const sorted = [...positions].sort((a, b) => a - b);
   if (positions.length >= 2 && positions.some((p, i) => p !== sorted[i])) {
     violations.push('reading order broken: headings appear in a different order in the extracted PDF');
