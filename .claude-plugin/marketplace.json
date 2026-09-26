@@ -1,0 +1,16 @@
+{
+  "name": "jobpilot",
+  "owner": {
+    "name": "Krutarth22",
+    "url": "https://github.com/Krutarth22"
+  },
+  "plugins": [
+    {
+      "name": "jobpilot",
+      "source": "./",
+      "description": "A small job-search copilot: one-resume setup, zero-token ATS scanning, fit scoring, recruiter-view review, contact drafts, apply-with-review.",
+      "version": "0.1.0",
+      "category": "productivity"
+    }
+  ]
+}

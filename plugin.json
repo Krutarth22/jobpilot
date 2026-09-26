@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "jobpilot",
+  "version": "0.1.0",
+  "description": "A small job-search copilot: one-resume setup, zero-token ATS scanning, fit scoring, recruiter-view review, contact drafts, and apply-with-review. Greenhouse, Lever and Ashby only.",
+  "author": {
+    "name": "Krutarth22",
+    "url": "https://github.com/Krutarth22"
+  },
+  "homepage": "https://github.com/Krutarth22/jobpilot",
+  "repository": "https://github.com/Krutarth22/jobpilot",
+  "license": "MIT",
+  "keywords": ["jobs", "job-search", "greenhouse", "lever", "ashby", "resume", "ats"]
+}

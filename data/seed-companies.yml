@@ -1,0 +1,80 @@
+# jobpilot companies.yml — the boards `scan` fetches.
+#
+# Each entry is one ATS board: { name, provider, slug } where slug is the
+# board token in the public API URL (jobs.ashbyhq.com/<slug>,
+# boards.greenhouse.io/<slug>, jobs.lever.co/<slug>).
+#
+# `setup` rewrites title_filter and location_filter from your profile and
+# may append companies it suggests for your domain (each checked against the
+# API before being saved here). This seed is a starting point — boards that
+# no longer exist are skipped by scan with a warning, never a crash.
+
+title_filter:
+  positive:
+    - engineer
+    - developer
+    - engineering manager
+    - product manager
+    - designer
+    - data
+  negative:
+    - sales
+    - recruiter
+    - university
+
+location_filter: {}
+
+companies:
+  # ── Greenhouse ──────────────────────────────────────────────────────
+  - { name: Stripe, provider: greenhouse, slug: stripe }
+  - { name: Airbnb, provider: greenhouse, slug: airbnb }
+  - { name: Coinbase, provider: greenhouse, slug: coinbase }
+  - { name: Figma, provider: greenhouse, slug: figma }
+  - { name: Databricks, provider: greenhouse, slug: databricks }
+  - { name: DoorDash, provider: greenhouse, slug: doordash }
+  - { name: Robinhood, provider: greenhouse, slug: robinhood }
+  - { name: Reddit, provider: greenhouse, slug: reddit }
+  - { name: Flexport, provider: greenhouse, slug: flexport }
+  - { name: Gusto, provider: greenhouse, slug: gusto }
+  - { name: Benchling, provider: greenhouse, slug: benchling }
+  - { name: Cloudflare, provider: greenhouse, slug: cloudflare }
+  - { name: Dropbox, provider: greenhouse, slug: dropbox }
+  - { name: Nubank, provider: greenhouse, slug: nubank }
+  - { name: Duolingo, provider: greenhouse, slug: duolingo }
+  - { name: Lyft, provider: greenhouse, slug: lyft }
+  - { name: PagerDuty, provider: greenhouse, slug: pagerduty }
+  - { name: Grammarly, provider: greenhouse, slug: grammarly }
+  - { name: Twilio, provider: greenhouse, slug: twilio }
+  - { name: GitLab, provider: greenhouse, slug: gitlab }
+  - { name: Okta, provider: greenhouse, slug: okta }
+  - { name: Elastic, provider: greenhouse, slug: elastic }
+  - { name: Sourcegraph, provider: greenhouse, slug: sourcegraph }
+  - { name: Verkada, provider: greenhouse, slug: verkada }
+  - { name: Ripple, provider: greenhouse, slug: ripple }
+  - { name: Coursera, provider: greenhouse, slug: coursera }
+  - { name: Udemy, provider: greenhouse, slug: udemy }
+  - { name: SpaceX, provider: greenhouse, slug: spacex }
+  - { name: Digital Ocean, provider: greenhouse, slug: digitalocean }
+  # ── Lever ───────────────────────────────────────────────────────────
+  - { name: Palantir, provider: lever, slug: palantir }
+  - { name: Plaid, provider: lever, slug: plaid }
+  - { name: Brex, provider: lever, slug: brex }
+  - { name: ByteDance, provider: lever, slug: bytedance }
+  - { name: Nextdoor, provider: lever, slug: nextdoor }
+  - { name: CloudKitchens, provider: lever, slug: cloudkitchens }
+  - { name: Hims & Hers, provider: lever, slug: hims }
+  - { name: Mixpanel, provider: lever, slug: mixpanel }
+  - { name: Sumo Logic, provider: lever, slug: sumologic }
+  - { name: Attentive, provider: lever, slug: attentive }
+  # ── Ashby ───────────────────────────────────────────────────────────
+  - { name: Linear, provider: ashby, slug: linear }
+  - { name: Ramp, provider: ashby, slug: ramp }
+  - { name: Deel, provider: ashby, slug: deel }
+  - { name: Supabase, provider: ashby, slug: supabase }
+  - { name: PostHog, provider: ashby, slug: posthog }
+  - { name: Neon, provider: ashby, slug: neon }
+  - { name: Cal.com, provider: ashby, slug: cal.com }
+  - { name: Sardine, provider: ashby, slug: sardine }
+  - { name: Browserbase, provider: ashby, slug: browserbase }
+  - { name: Mercury, provider: ashby, slug: mercury }
+  - { name: Ashby, provider: ashby, slug: ashby }

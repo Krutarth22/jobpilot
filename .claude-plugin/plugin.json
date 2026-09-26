@@ -1,0 +1,12 @@
+{
+  "name": "jobpilot",
+  "version": "0.1.0",
+  "description": "A small job-search copilot: setup from one resume, zero-token ATS scanning (Greenhouse/Lever/Ashby), fit scoring, recruiter-view review, contact drafts, apply-with-review.",
+  "author": {
+    "name": "Krutarth22",
+    "url": "https://github.com/Krutarth22"
+  },
+  "homepage": "https://github.com/Krutarth22/jobpilot",
+  "license": "MIT",
+  "keywords": ["jobs", "job-search", "ats", "resume"]
+}
