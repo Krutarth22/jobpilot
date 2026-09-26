@@ -152,7 +152,7 @@ export const PRACTICE_TERMS = [
   ['Deep learning', /\bdeep learning\b|\bneural networks?\b/i],
   ['Recommender systems', /\brecommend(?:er|ation)s? (?:systems?|engines?|models?)\b|\bpersonali[sz]ation\b/i],
   ['Search and ranking', /\bsearch (?:and|&) (?:ranking|discovery|relevance)\b|\bsearch relevance\b|\branking models?\b|\blearning to rank\b/i],
-  ['Model evaluation', /\bevals\b|\bmodel evaluation\b/i],
+  ['Model evaluation', /\bevals\b|\b(?:model|llm|ai) evaluations?\b/i],
   ['Anomaly detection', /\banomaly detection\b/i],
   ['Data pipelines', /\bdata pipelines?\b|\bETL\b/],
   ['Data platform', /\bdata (?:platform|infrastructure)\b/i],

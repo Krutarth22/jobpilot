@@ -32,7 +32,9 @@ tailored resume that passes the fact gate and an ATS round-trip.
    ```sh
    node "<pluginRoot>/scripts/review.mjs" <id>
    ```
-   Present it as a table: **must-have coverage %** (from the match checklist), **keyword coverage %** (+ the missing skills), **30-second screen verdict** with its check list, and the ATS check once a PDF exists.
+   Present it as a table, **ATS score first** — it's the number people understand:
+   - **ATS score (0–100)** from `atsScore.original`: how the user's current resume does in an applicant tracking system for this job. Show the three parts (keywords /50, readable /30, format /20) and the `fixes` list in plain words. Missing keywords come split in two: `keywordsYouCanAdd` (the profile backs them — safe to add) and `keywordGaps` (not backed — these are gaps, never add them). Say once that repeating keywords doesn't raise the score.
+   - **Must-have coverage %** (from the match checklist), **keyword coverage %** (+ the missing terms), and the **30-second screen verdict** with its check list.
 4. **Judge the one AI item in the screen** — "is the company or domain recognizable for this role" — from the JD and your market knowledge. State it as its own line, never folded into the code checks.
 5. **Claim self-check** — a candidate-side pass over your own resume, so nothing in it surprises you when a recruiter checks it first. See [references/claim-rubric.md](references/claim-rubric.md) for the assessment rules (ported from resume-claim-verification).
    - If `<workspace>/claims.json` is missing, or `node "<pluginRoot>/scripts/claims.mjs" for-job <id>` reports it stale (profile.md changed since it was built), build it once:
@@ -68,5 +70,10 @@ tailored resume that passes the fact gate and an ATS round-trip.
      node "<pluginRoot>/scripts/review.mjs" ats "<workspace>/out/resume-<company-slug>.pdf" "<workspace>/out/resume-<company-slug>.html"
      ```
      This parses the PDF back the way an ATS would and checks headings, reading order and skill tokens survive. Fix the HTML if anything is lost.
+   - Score the tailored PDF and show **before → after** (e.g. "ATS score 68 → 91"), with anything still in its `fixes` list:
+     ```sh
+     node "<pluginRoot>/scripts/review.mjs" <id> --resume "<workspace>/out/resume-<company-slug>.pdf"
+     ```
+     Raise the score only with keywords from `keywordsYouCanAdd` — never with gaps.
    - Save the critique next to them as `out/review-<id>-<company-slug>.md`.
-8. Report: the scorecard, the claim self-check findings, the PDF path, page count, the lint findings, and remind the user: every bullet is traceable to `profile.md` — tell me if anything reads wrong and I'll fix the source, not just the copy.
+8. Report: the ATS score (before → after), the scorecard, the claim self-check findings, the PDF path, page count, the lint findings, and remind the user: every bullet is traceable to `profile.md` — tell me if anything reads wrong and I'll fix the source, not just the copy.

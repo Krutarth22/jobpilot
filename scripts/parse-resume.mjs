@@ -33,6 +33,17 @@ export async function extractText(filePath) {
   throw new Error(`unsupported resume format "${ext}" — use PDF, DOCX, TXT or MD`);
 }
 
+/** Text plus page count (PDF only; null for other formats) — the ATS score
+ * needs the length, not just the words. */
+export async function extractDocument(filePath) {
+  if (extname(filePath).toLowerCase() === '.pdf') {
+    const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+    const { text, numpages } = await pdfParse(await readFile(filePath));
+    return { text, pages: numpages ?? null };
+  }
+  return { text: await extractText(filePath), pages: null };
+}
+
 if (isMainModule(import.meta.url)) {
   const file = process.argv[2];
   if (!file) {

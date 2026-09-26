@@ -53,7 +53,7 @@ flowchart LR
 | ⚙️ **setup** | Reads your resume, works out the roles, seniority and locations that suit you, and asks you to confirm | Your profile, plus a list of companies to watch |
 | 🔍 **scan** | Checks the career pages of every company on your list (100+ to start with) | New jobs in your tracker, with the date posted and pay when listed. Reposted jobs are flagged, closed ones are marked closed, and you're told when your filters are too narrow |
 | 📊 **match** | Reads each job post next to your profile and scores the fit from 0 to 100 | A score you can check line by line: which requirements you meet, with a quote from your profile for each one |
-| 🧐 **review** | Reads your profile the way that job's recruiter would | Your strengths, honest gaps, missing keywords, rewritten bullet points, a check of which resume claims a recruiter could question, and an optional tailored resume PDF |
+| 🧐 **review** | Reads your profile the way that job's recruiter would | An **ATS score** out of 100 with what to fix, your strengths, honest gaps, rewritten bullet points, a check of which resume claims a recruiter could question, and an optional tailored resume PDF (with its new ATS score) |
 | 🤝 **contact** | Looks up the likely recruiter or hiring manager | Who they are, how sure it is, and a LinkedIn note under 300 characters |
 | 📝 **apply** | Opens the real application form in a browser and fills it in from your profile | A filled form, a screenshot, and a list of the fields it couldn't answer. **It stops before Submit.** |
 
@@ -166,6 +166,27 @@ Next to each score you'll see a short breakdown such as `S22/35 Sn20/25 D10/15 L
 **Two safety checks** catch the AI getting it wrong:
 - A "meets it" answer without a real quote from your profile is downgraded to "partly".
 - Every requirement must actually appear in the job post, and the score is compared with a simple keyword count. If either check fails, the job is re-checked.
+
+</details>
+
+<details>
+<summary><b>What is the ATS score?</b></summary>
+
+Most companies run resumes through an **applicant tracking system (ATS)**. It turns your file into text, and recruiters then search that text for keywords. The ATS score (0–100) shows how well your resume survives that for one specific job.
+
+| Part | Points | What it checks |
+|---|---|---|
+| Keywords | 50 | The job's must-have terms (30), its other terms (10), and the job title's wording (10) |
+| Readable | 30 | Real text rather than a scanned image, standard section headings, email and phone as plain text, no garbled characters |
+| Format | 20 | Two pages or fewer, a date range for every role, PDF or DOCX |
+
+You see it twice: once for your current resume, and again for the tailored version, for example **68 → 91**. Every lost point comes with a plain fix.
+
+Missing keywords are split into two lists:
+- **Safe to add:** your experience backs them, so they can go in.
+- **Gaps:** they're never added.
+
+Repeating a keyword doesn't raise the score, so keyword stuffing doesn't help.
 
 </details>
 

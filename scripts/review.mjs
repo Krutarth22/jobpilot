@@ -17,10 +17,13 @@ import {
 import { isMainModule } from './lib/main.mjs';
 import { loadProfile } from './lib/profile.mjs';
 import { extractSkills, extractTerms } from './lib/skills.mjs';
+import { atsScore } from './lib/ats.mjs';
 import { jdSkillList, extractLevel, levelDistance } from './lib/signals.mjs';
 import { fetchDescription } from './jobs.mjs';
 import { htmlToLines } from './check-resume.mjs';
-import { extractText } from './parse-resume.mjs';
+import { extractText, extractDocument } from './parse-resume.mjs';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 // ── C1: scorecard ───────────────────────────────────────────────────────
 
@@ -204,6 +207,20 @@ export function mustHaveKeywords(checklist) {
 
 // ── CLI ─────────────────────────────────────────────────────────────────
 
+/** The resume setup saved in the workspace (resume.pdf / .docx), if any. */
+export function originalResumePath(root) {
+  for (const ext of ['pdf', 'docx']) {
+    const p = join(root, `resume.${ext}`);
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+async function scoreFile(file, ctx) {
+  const { text, pages } = await extractDocument(file);
+  return atsScore({ ...ctx, text, pages, fileName: file });
+}
+
 async function main(argv) {
   const [cmd, ...rest] = argv;
   const root = workspaceRoot();
@@ -216,9 +233,24 @@ async function main(argv) {
     process.exit(result.ok ? 0 : 1);
   }
 
+  if (cmd === 'ats-score') {
+    const [jobId, file] = rest;
+    if (!jobId) { console.error('Usage: review.mjs ats-score <id> [resume.pdf|docx]'); process.exit(1); }
+    const job = findJob(root, jobId);
+    if (!job) { console.error(`no job matching "${jobId}" in jobs.csv`); process.exit(1); }
+    const target = file || originalResumePath(root);
+    if (!target) { console.error('no resume given and none saved in the workspace'); process.exit(1); }
+    const { profile, body: profileBody } = loadProfile(root);
+    let jdText = '';
+    try { jdText = await fetchDescription(root, job); } catch { /* keywords part is skipped without it */ }
+    const result = await scoreFile(target, { jdText, checklist: readEval(root, job.id)?.checklist, jobTitle: job.title, profile, profileBody });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
   const id = cmd;
   if (!id) {
-    console.error('Usage: node review.mjs <id> [--resume out/tailored.pdf] | ats <pdf> <html>');
+    console.error('Usage: node review.mjs <id> [--resume out/tailored.pdf] | ats <pdf> <html> | ats-score <id> [resume]');
     process.exit(1);
   }
   const job = findJob(root, id);
@@ -239,7 +271,20 @@ async function main(argv) {
   const mustHave = mustHaveCoverage(checklist);
   const keywords = keywordCoverage(jdText, profile, profileBody);
   const screen = thirtySecondScreen({ profile, profileBody, tailoredText });
-  const ats = resumeArg && /\.pdf$/i.test(resumeArg) ? await atsRoundTrip(resumeArg, resumeArg.replace(/\.pdf$/i, '.html')) : null;
+  // The round-trip compares the PDF with the HTML it was rendered from; a PDF
+  // without its HTML (e.g. one the user made) still gets an ATS score below.
+  const htmlSibling = resumeArg ? resumeArg.replace(/\.pdf$/i, '.html') : null;
+  const ats = resumeArg && /\.pdf$/i.test(resumeArg) && existsSync(htmlSibling)
+    ? await atsRoundTrip(resumeArg, htmlSibling) : null;
+
+  // ATS score (0–100): the original resume, and the tailored one when given,
+  // so the user sees before → after.
+  const ctx = { jdText, checklist, jobTitle: job.title, profile, profileBody };
+  const original = originalResumePath(root);
+  const atsScores = {
+    original: original ? await scoreFile(original, ctx) : null,
+    tailored: resumeArg && /\.(pdf|docx)$/i.test(resumeArg) ? await scoreFile(resumeArg, ctx) : null,
+  };
 
   const scorecard = {
     id: job.id,
@@ -249,6 +294,7 @@ async function main(argv) {
     keywordCoverage: keywords,
     screen,
     ats,
+    atsScore: atsScores,
     note: 'must-have % comes from the match checklist; screen checks are code over profile.md + resume; "recognizable" and prose verdicts are the review skill\'s AI',
   };
   console.log(JSON.stringify(scorecard, null, 2));
