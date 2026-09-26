@@ -8,8 +8,8 @@
 #      scripts via the same absolute path on any CLI.
 #
 # Claude Code and Codex should install via their plugin commands instead:
-#   Claude Code: /plugin marketplace add Krutarth22/jobpilot && /plugin install jobpilot
-#   Codex:       codex plugin marketplace add Krutarth22/jobpilot
+#   Claude Code: /plugin marketplace add Krutarth22/jobpilot && /plugin install jobpilot@jobpilot
+#   Codex:       codex plugin marketplace add Krutarth22/jobpilot && codex plugin add jobpilot@jobpilot
 set -eu
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"

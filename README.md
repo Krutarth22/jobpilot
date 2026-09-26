@@ -13,24 +13,27 @@ Designed to be the opposite of a 40-mode pipeline: **5 modes, 3 job sources,
 **Claude Code**
 ```
 /plugin marketplace add Krutarth22/jobpilot
-/plugin install jobpilot
+/plugin install jobpilot@jobpilot
 ```
 
 **Codex**
 ```
 codex plugin marketplace add Krutarth22/jobpilot
+codex plugin add jobpilot@jobpilot
 ```
 
-**Cursor (or any CLI without a plugin system)**
+**Cursor**
 ```
-git clone https://github.com/Krutarth22/jobpilot && cd jobpilot
-./install.sh
+cursor-agent plugin marketplace add https://github.com/Krutarth22/jobpilot
 ```
-`install.sh` symlinks the skills into your CLI's skills folder and records the
-plugin root in `~/.jobpilot.json`.
+then open `/plugins` in an interactive session and install **jobpilot**.
+No plugin support in your setup? `git clone` this repo and run `./install.sh`,
+which symlinks the skills into `~/.cursor/skills` (and Codex / `.agents`).
 
-Then `npm i` in the plugin folder (pdf-parse, mammoth, js-yaml, playwright)
-and `npx playwright install chromium` once, for the tailored-resume PDF.
+Then run `/jobpilot:setup path/to/resume.pdf`. The first run installs the
+npm dependencies into the plugin folder. For tailored-resume PDFs, run
+`npx playwright install chromium` once. `apply` uses the Playwright MCP
+server that ships with the plugin.
 
 ## The 5 modes
 
