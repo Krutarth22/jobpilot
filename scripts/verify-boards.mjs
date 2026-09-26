@@ -5,9 +5,11 @@
 //   node verify-boards.mjs --prune             # ... and rewrite companies.yml without them
 //   node verify-boards.mjs --add "Ramp" "Deel" # probe slug variants for new companies, append live boards
 //
-// A board is DEAD only on a 404 (or a board that returns zero jobs); network
-// errors leave it in place and reported as unknown. Adapted from the probe
-// approach in career-ops discover-ats.mjs (MIT).
+// A board is DEAD only on a 404. A board with zero open jobs is EMPTY — the
+// company exists and just isn't hiring today — and is never pruned. Network
+// errors leave a board in place, reported as unknown. Edits to companies.yml
+// keep its comments and layout. Adapted from the probe approach in career-ops
+// discover-ats.mjs (MIT).
 
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import yaml from 'js-yaml';
@@ -29,25 +31,110 @@ export function slugVariants(name) {
   return [...new Set(variants)];
 }
 
-async function probeBoard(provider, slug) {
+export async function probeBoard(provider, slug, { fetchBoard = PROVIDERS[provider].fetchBoard } = {}) {
   try {
-    const rows = await PROVIDERS[provider].fetchBoard({ name: slug, slug });
-    return rows.length > 0 ? { live: true, count: rows.length } : { live: false, reason: 'board has zero jobs' };
+    const rows = await fetchBoard({ name: slug, slug });
+    return { live: true, count: rows.length, rows };
   } catch (err) {
     if (err?.status === 404) return { live: false, reason: '404' };
     return { unknown: true, reason: err instanceof Error ? err.message : String(err) };
   }
 }
 
-/** First live board for a name across slug variants × providers (first match wins). */
-export async function discoverBoard(name, { providers = Object.keys(PROVIDERS) } = {}) {
-  for (const provider of providers) {
-    for (const slug of slugVariants(name)) {
-      const result = await probeBoard(provider, slug);
-      if (result.live) return { name, provider, slug, count: result.count };
+const words = (s) => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+const startsWithWords = (haystack, needle) => needle.length > 0 && needle.every((w, i) => haystack[i] === w);
+
+/**
+ * Does this board belong to `name`? Slugs collide ("ramp" on one ATS can be
+ * a different company), so a guessed slug is only trusted when Greenhouse's
+ * board name matches word for word ("Ramp" ↔ "Ramp Health", never
+ * "Rampart"), or a posting's description names the company as whole words.
+ */
+export async function boardMatchesName(provider, slug, name, rows, { fetchBoardName = greenhouse.fetchBoardName } = {}) {
+  const want = words(name);
+  if (want.length === 0) return false;
+  if (provider === 'greenhouse') {
+    try {
+      const board = words(await fetchBoardName(slug));
+      return startsWithWords(board, want) || startsWithWords(want, board);
+    } catch {
+      return false;
     }
   }
-  return null;
+  const phrase = ` ${want.join(' ')} `;
+  return rows.slice(0, 10).some((r) => ` ${words(r.description).join(' ')} `.includes(phrase));
+}
+
+/**
+ * Probe slug variants × providers for a company name. Returns the first
+ * board confirmed to belong to it, plus live-but-unconfirmed candidates the
+ * user can check by hand.
+ */
+export async function discoverBoard(name, { providers = Object.keys(PROVIDERS), probe = probeBoard, matches = boardMatchesName } = {}) {
+  const unconfirmed = [];
+  for (const provider of providers) {
+    for (const slug of slugVariants(name)) {
+      const result = await probe(provider, slug);
+      if (!result.live || result.count === 0) continue;
+      if (await matches(provider, slug, name, result.rows)) {
+        return { found: { name, provider, slug, count: result.count }, unconfirmed };
+      }
+      unconfirmed.push({ provider, slug, count: result.count });
+    }
+  }
+  return { found: null, unconfirmed };
+}
+
+// ── Comment-preserving companies.yml edits ─────────────────────────────
+
+function entryLine(entry) {
+  const flow = yaml.dump(entry, { flowLevel: 0, lineWidth: -1 }).trim(); // {name: X, …}
+  return `  - ${flow.replace(/^\{/, '{ ').replace(/\}$/, ' }')}`;
+}
+
+/** Append entries at the end of the `companies:` list, keeping everything
+ * else (comments, filters, layout) byte-for-byte. */
+export function appendEntries(text, entries) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => /^companies:\s*(#.*)?$/.test(l));
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^[^\s#-]/.test(lines[i])) { end = i; break; } // next top-level key
+  }
+  while (end > start + 1 && lines[end - 1].trim() === '') end--; // keep trailing blank lines after the list
+  lines.splice(end, 0, ...entries.map(entryLine));
+  return lines.join('\n');
+}
+
+/** Remove single-line flow entries for the given provider:slug keys. */
+export function removeEntries(text, deadKeys) {
+  return text.split('\n').filter((line) => {
+    const m = line.match(/^\s*-\s*\{.*\}\s*(#.*)?$/);
+    if (!m) return true;
+    try {
+      const [entry] = yaml.load(line.trim());
+      return !deadKeys.has(`${entry?.provider}:${entry?.slug}`);
+    } catch {
+      return true;
+    }
+  }).join('\n');
+}
+
+/** Write companies.yml via a text edit when it round-trips; fall back to a
+ * full re-dump (which loses comments) only when the file isn't in the
+ * one-entry-per-line style. */
+async function saveCompanies(file, text, edited, expected) {
+  const ok = edited !== null && (yaml.load(edited)?.companies || []).length === expected.length;
+  await rename(file, `${file}.bak`);
+  if (ok) {
+    await writeFile(file, edited);
+  } else {
+    const config = yaml.load(text);
+    config.companies = expected;
+    await writeFile(file, yaml.dump(config, { lineWidth: 120 }));
+    console.error('⚠️  companies.yml is not one entry per line — rewrote it without comments (backup kept)');
+  }
 }
 
 async function mapPool(items, limit, fn) {
@@ -61,19 +148,23 @@ async function mapPool(items, limit, fn) {
 
 async function verifyAll(root, { prune = false } = {}) {
   const file = companiesPath(root);
-  const config = yaml.load(await readFile(file, 'utf8'));
+  const text = await readFile(file, 'utf8');
+  const config = yaml.load(text);
   const companies = (config.companies || []).filter((c) => c?.name && c?.slug && PROVIDERS[c.provider]);
   const results = await mapPool(companies, CONCURRENCY, async (entry) => ({ entry, result: await probeBoard(entry.provider, entry.slug) }));
 
   const dead = results.filter(({ result }) => result.live === false);
   const unknown = results.filter(({ result }) => result.unknown);
   const alive = results.filter(({ result }) => result.live);
+  const empty = alive.filter(({ result }) => result.count === 0);
 
   for (const { entry, result } of dead) console.error(`💀 dead: ${entry.provider}:${entry.slug} (${entry.name}) — ${result.reason}`);
+  for (const { entry } of empty) console.error(`💤 empty: ${entry.provider}:${entry.slug} (${entry.name}) — no open jobs today (kept)`);
   for (const { entry, result } of unknown) console.error(`❓ unknown: ${entry.provider}:${entry.slug} (${entry.name}) — ${result.reason}`);
   console.log(JSON.stringify({
     boards: companies.length,
     live: alive.length,
+    empty: empty.length,
     dead: dead.length,
     unknown: unknown.length,
     pruned: prune ? dead.map(({ entry }) => entry.slug) : [],
@@ -81,9 +172,8 @@ async function verifyAll(root, { prune = false } = {}) {
 
   if (prune && dead.length > 0) {
     const deadKeys = new Set(dead.map(({ entry }) => `${entry.provider}:${entry.slug}`));
-    config.companies = (config.companies || []).filter((c) => !deadKeys.has(`${c.provider}:${c.slug}`));
-    await rename(file, `${file}.bak`);
-    await writeFile(file, yaml.dump(config, { lineWidth: 120 }));
+    const kept = (config.companies || []).filter((c) => !deadKeys.has(`${c.provider}:${c.slug}`));
+    await saveCompanies(file, text, removeEntries(text, deadKeys), kept);
     console.error(`✂️  pruned ${dead.length} board(s); backup at companies.yml.bak`);
   }
   return { dead: dead.length, unknown: unknown.length };
@@ -91,27 +181,30 @@ async function verifyAll(root, { prune = false } = {}) {
 
 async function addCompanies(root, names) {
   const file = companiesPath(root);
-  const config = yaml.load(await readFile(file, 'utf8'));
+  const text = await readFile(file, 'utf8');
+  const config = yaml.load(text);
   const existing = new Set((config.companies || []).map((c) => String(c.name).toLowerCase()));
   const added = [];
+  const unconfirmed = [];
   for (const name of names) {
     if (existing.has(name.toLowerCase())) { console.error(`⏭️  ${name}: already in companies.yml`); continue; }
-    const found = await discoverBoard(name);
+    const { found, unconfirmed: maybes } = await discoverBoard(name);
     if (found) {
-      config.companies = config.companies || [];
-      config.companies.push({ name: found.name, provider: found.provider, slug: found.slug });
       added.push(found);
       console.error(`✅ ${name}: ${found.provider}:${found.slug} (${found.count} jobs)`);
+    } else if (maybes.length > 0) {
+      unconfirmed.push({ name, candidates: maybes });
+      console.error(`❔ ${name}: live boards found but none confirmed as this company — ${maybes.map((m) => `${m.provider}:${m.slug}`).join(', ')} (not added; check by hand)`);
     } else {
       console.error(`❌ ${name}: no live Greenhouse/Lever/Ashby board found for slug variants ${slugVariants(name).join(', ')}`);
     }
   }
   if (added.length > 0) {
-    await rename(file, `${file}.bak`);
-    await writeFile(file, yaml.dump(config, { lineWidth: 120 }));
+    const entries = added.map(({ name, provider, slug }) => ({ name, provider, slug }));
+    await saveCompanies(file, text, appendEntries(text, entries), [...(config.companies || []), ...entries]);
     console.error(`💾 appended ${added.length} board(s); backup at companies.yml.bak`);
   }
-  console.log(JSON.stringify({ added }, null, 2));
+  console.log(JSON.stringify({ added, unconfirmed }, null, 2));
 }
 
 async function main(argv) {

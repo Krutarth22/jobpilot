@@ -32,11 +32,12 @@ test('level: title wins over JD prose', () => {
   assert.equal(extractLevel('Cook', ''), null);
 });
 
-test('level distance (dual-track scale: IC senior → manager is one step)', () => {
+test('level distance (dual-track scale; switching IC ↔ management costs one extra step)', () => {
   assert.equal(levelDistance('ic-senior', 'ic-senior'), 0);
-  assert.equal(levelDistance('ic-senior', 'manager'), 1);
+  assert.equal(levelDistance('ic-senior', 'manager'), 2);
+  assert.equal(levelDistance('staff', 'manager'), 1); // same rung, different track
   assert.equal(levelDistance('ic-mid', 'principal'), 3);
-  assert.equal(levelDistance('ic-mid', 'director'), 4);
+  assert.equal(levelDistance('ic-mid', 'director'), 5);
   assert.equal(levelDistance('manager', 'director'), 2);
   assert.equal(levelDistance('unknown', 'director'), null);
 });

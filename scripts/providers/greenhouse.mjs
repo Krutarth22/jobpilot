@@ -113,3 +113,10 @@ export async function fetchDescription({ slug }, jobId, { fetchJson: fetchJsonFn
   const json = await fetchJsonFn(assertUrl(apiUrlFor(slug).replace(/\/jobs$/, `/jobs/${jobId}`)), { redirect: 'error' });
   return typeof json?.content === 'string' ? json.content : '';
 }
+
+/** The board's display name ("Figma"), for checking a slug belongs to the
+ * company it was guessed for. */
+export async function fetchBoardName(slug, { fetchJson: fetchJsonFn = fetchJson } = {}) {
+  const json = await fetchJsonFn(assertUrl(apiUrlFor(slug).replace(/\/jobs$/, '')), { redirect: 'error' });
+  return typeof json?.name === 'string' ? json.name : '';
+}

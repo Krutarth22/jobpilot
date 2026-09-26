@@ -5,30 +5,43 @@
 
 import { extractSkills } from './skills.mjs';
 
-// Level ladder — two tracks (IC and management) mapped onto ONE scale, so
-// "steps away" comparisons work across tracks too (an IC senior targeting a
-// manager role is one step, not three: staff/principal sit between them on
-// the IC ladder only).
+// Level ladder — two tracks (IC and management) mapped onto ONE scale.
+// Switching tracks costs one extra step: a manager applying to a staff IC
+// role, or a senior IC applying to a manager role, is a real mismatch even
+// when the rungs line up.
 export const LEVELS = ['ic-mid', 'ic-senior', 'staff', 'principal', 'manager', 'senior-manager', 'director'];
 const LEVEL_SCALE = { 'ic-mid': 0, 'ic-senior': 1, staff: 2, principal: 3, manager: 2, 'senior-manager': 3, director: 4 };
+const MANAGEMENT = new Set(['manager', 'senior-manager', 'director']);
+
+// "Product Manager", "Account Manager" … are job functions, not people
+// management; strip them before level matching so "Senior Product Manager"
+// reads as a senior IC, not a senior manager.
+const NON_PEOPLE_MANAGER = /\b(product|program|project|account|marketing|sales|partner|community|customer success)\s+manager\b/gi;
 
 const TITLE_LEVEL_PATTERNS = [
-  [/director|head of|vp\b|vice president/i, 'director'],
-  [/senior manager|sr\.? manager|group lead/i, 'senior-manager'],
-  [/\bmanager\b|\blead\b/i, 'manager'],
-  [/principal|distinguished|architect\b/i, 'principal'],
-  [/staff/i, 'staff'],
-  [/senior|sr\.?\b|lead engineer/i, 'ic-senior'],
+  [/\bdirector\b|\bhead of\b|\bvp\b|\bvice president\b/i, 'director'],
+  [/\b(?:senior|sr\.?)\s+(?:[\w-]+\s+)?manager\b|\bgroup (?:engineering )?manager\b|\bmanager of managers\b/i, 'senior-manager'],
+  [/\bmanager\b/i, 'manager'], // includes "Tech Lead Manager"; a bare "Lead" is an IC (below)
+  [/\bprincipal\b|\bdistinguished\b|\barchitect\b/i, 'principal'],
+  [/\bstaff\b/i, 'staff'],
+  [/\bsenior\b|\bsr\b\.?|\blead\b|\biii\b/i, 'ic-senior'],
+  [/\bii\b|\bmid[- ]level\b|\bintermediate\b/i, 'ic-mid'],
 ];
 
+// Prose is noisy ("you'll work with senior leaders"), so the JD only
+// counts when it states the level of THIS role.
 const JD_LEVEL_PATTERNS = [
   [/director[- ]level|head of/i, 'director'],
   [/senior manager/i, 'senior-manager'],
   [/people[- ]management|managing (a team|engineers|managers)/i, 'manager'],
   [/principal (engineer|architect)/i, 'principal'],
   [/staff (engineer|level)/i, 'staff'],
-  [/senior\b/i, 'ic-senior'],
+  [/\bsenior[- ]level\b/i, 'ic-senior'],
 ];
+
+// A plain individual-contributor title with no level word ("Software
+// Engineer", "Data Scientist") is mid-level at nearly every company.
+const IC_TITLE = /\b(engineer|developer|scientist|analyst|designer|researcher)\b/i;
 
 function fromPatterns(text, patterns) {
   for (const [re, level] of patterns) if (re.test(text)) return level;
@@ -42,10 +55,12 @@ export function levelIndex(level) {
 }
 
 export function levelDistance(a, b) {
-  const ia = LEVEL_SCALE[String(a || '').toLowerCase()];
-  const ib = LEVEL_SCALE[String(b || '').toLowerCase()];
+  const la = String(a || '').toLowerCase();
+  const lb = String(b || '').toLowerCase();
+  const ia = LEVEL_SCALE[la];
+  const ib = LEVEL_SCALE[lb];
   if (ia === undefined || ib === undefined) return null;
-  return Math.abs(ia - ib);
+  return Math.abs(ia - ib) + (MANAGEMENT.has(la) !== MANAGEMENT.has(lb) ? 1 : 0);
 }
 
 /**
@@ -74,30 +89,42 @@ export function extractYears(jdText = '') {
 }
 
 /**
- * Level from the title first (most reliable), then the JD prose.
- * @returns {{level: string, source: 'title'|'jd'}|null}
+ * Level from the title first (most reliable), then an explicit statement in
+ * the JD, then the plain-IC-title default.
+ * @returns {{level: string, source: 'title'|'jd'|'title-default'}|null}
  */
 export function extractLevel(title = '', jdText = '') {
-  const fromTitle = fromPatterns(title || '', TITLE_LEVEL_PATTERNS);
+  const cleanTitle = String(title || '').replace(NON_PEOPLE_MANAGER, '$1 role');
+  const fromTitle = fromPatterns(cleanTitle, TITLE_LEVEL_PATTERNS);
   if (fromTitle) return { level: fromTitle, source: 'title' };
   const fromJd = fromPatterns(jdText || '', JD_LEVEL_PATTERNS);
   if (fromJd) return { level: fromJd, source: 'jd' };
+  if (IC_TITLE.test(cleanTitle)) return { level: 'ic-mid', source: 'title-default' };
   return null;
 }
 
+// "3 days a week in the office" is hybrid, not on-site only.
+const PARTIAL_OFFICE_DAYS = /\b(?:[1-4]|one|two|three|four)\s*(?:days?|x)\s*(?:a|per|\/)\s*week\b|\bin[- ]?office\s*(?:[1-4]|one|two|three|four)\s*days?\b/i;
+const FULLY_ONSITE = /\bno remote\b|must be (?:on[- ]?site|in the office)|\bon[- ]?site only\b|\bfully (?:on[- ]?site|in[- ]office)\b|\b(?:5|five)\s*days? (?:a|per) week\b|\bin[- ]?office (?:5|five) days\b/i;
+// Negated remote language must not read as "remote".
+const NOT_REMOTE = /\bnot (?:a )?remote\b|\bnot (?:eligible|available|open) for remote\b|\bremote (?:work )?(?:is )?not (?:available|an option|possible|offered)\b|\bnon[- ]remote\b/gi;
+
 /**
  * Work mode from the location string + JD text. "onsite_only" is true only
- * on an explicit requirement ("must be on-site", "5 days in office",
- * "no remote") — an absence of remote language is NOT evidence.
+ * on an explicit full-time requirement ("must be on-site", "5 days a week",
+ * "no remote") — partial office days are hybrid, and an absence of remote
+ * language is NOT evidence.
  * @returns {{mode: 'remote'|'hybrid'|'onsite'|null, onsite_only: boolean, source: string}}
  */
 export function extractWorkMode(location = '', jdText = '') {
+  if (PARTIAL_OFFICE_DAYS.test(jdText)) return { mode: 'hybrid', onsite_only: false, source: 'jd text (office days)' };
+  if (FULLY_ONSITE.test(jdText)) return { mode: 'onsite', onsite_only: true, source: 'jd text' };
   const haystack = `${location} ${jdText}`;
-  if (/\bno remote\b|not remote|must be (?:on[- ]?site|in the office)|on[- ]?site only|\b(?:4|5)\s*days? (?:a|per) week in (?:the )?office|in[- ]?office \d days?/i.test(jdText)) {
-    return { mode: 'onsite', onsite_only: true, source: 'jd text' };
-  }
   if (/\bhybrid\b/i.test(haystack)) return { mode: 'hybrid', onsite_only: false, source: 'location/jd' };
-  if (/\b(?:remote|work from home|distributed|wfh)\b/i.test(haystack)) return { mode: 'remote', onsite_only: false, source: 'location/jd' };
+  const withoutNegations = haystack.replace(NOT_REMOTE, ' ');
+  const negated = withoutNegations !== haystack;
+  if (/\b(?:remote|work from home|distributed|wfh)\b/i.test(withoutNegations)) return { mode: 'remote', onsite_only: false, source: 'location/jd' };
+  if (negated) return { mode: 'onsite', onsite_only: false, source: 'jd text (remote ruled out)' };
   if (/\bon[- ]?site\b/i.test(haystack)) return { mode: 'onsite', onsite_only: false, source: 'location/jd' };
   return { mode: null, onsite_only: false, source: 'none' };
 }
@@ -155,7 +182,7 @@ export function extractSalary(text = '') {
     if (min < 30_000 && !m[2] && !/[.,]\d{3}/.test(m[1])) continue;
     // Only trust a range or a number flagged as salary-like context nearby.
     const ctx = t.slice(Math.max(0, m.index - 60), m.index + m[0].length + 60);
-    const salaryContext = /salarn|compensation|base|pay|annum|annual|per year|\/yr|total/i.test(ctx) || /k\b/i.test(m[0]) || max >= 50_000;
+    const salaryContext = /salar(?:y|ies)|compensation|base|pay|annum|annual|per year|\/yr|total/i.test(ctx) || /k\b/i.test(m[0]) || max >= 50_000;
     if (!salaryContext) continue;
     return {
       min,

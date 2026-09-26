@@ -43,28 +43,51 @@ function normalizeText(s) {
   return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/** A "met" verdict must quote profile.md: some ≥4-word run of the evidence
- * must appear (normalized) in the profile body. */
-export function evidenceBacked(evidence, profileBody) {
-  const ev = normalizeText(evidence);
-  const prof = normalizeText(profileBody);
-  if (!ev || !prof) return false;
-  const words = ev.split(' ');
-  for (let len = Math.min(words.length, 8); len >= 3; len--) {
-    for (let i = 0; i + len <= words.length; i++) {
-      if (prof.includes(words.slice(i, i + len).join(' '))) return true;
-    }
+const STOPWORDS = new Set(['a', 'an', 'the', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'as', 'is', 'was', 'my', 'our', 'i', 'we']);
+export const MIN_QUOTE_WORDS = 4;
+
+/** The quoted spans of an evidence string, or the whole string (minus a
+ * leading "profile:") when nothing is quoted. Single quotes are matched
+ * greedily so an apostrophe inside the quote ("Acme's") survives. */
+function quotedSpans(evidence) {
+  const text = String(evidence || '');
+  const spans = [...text.matchAll(/"([^"]+)"|“([^”]+)”|'(.+)'/g)].map((m) => m[1] ?? m[2] ?? m[3]);
+  return spans.length > 0 ? spans : [text.replace(/^\s*profile\s*:\s*/i, '')];
+}
+
+/**
+ * A "met" verdict must QUOTE profile.md: the whole quoted span must appear
+ * (normalized, on word boundaries) in the profile body, and be either at
+ * least MIN_QUOTE_WORDS words with 2+ content words, or made up only of
+ * the profile's listed skills. Matching any short run inside a longer claim is
+ * not enough — "experience with python" must not vouch for "experience with
+ * python and kafka at scale".
+ */
+export function evidenceBacked(evidence, profileBody, profileSkills = []) {
+  const prof = ` ${normalizeText(profileBody)} `;
+  if (!prof.trim()) return false;
+  const skills = new Set(profileSkills.map(normalizeText));
+  for (const span of quotedSpans(evidence)) {
+    const quote = normalizeText(span);
+    if (!quote || !prof.includes(` ${quote} `)) continue;
+    const words = quote.split(' ');
+    const contentWords = words.filter((w) => !STOPWORDS.has(w));
+    if (words.length >= MIN_QUOTE_WORDS && contentWords.length >= 2) return true;
+    // A short quote is fine when it is (part of) the skills list itself:
+    // "Python, PyTorch, Kubernetes" — every item must be a listed skill.
+    const items = String(span).split(/[,;/|]/).map(normalizeText).filter(Boolean);
+    if (items.length > 0 && items.every((item) => skills.has(item))) return true;
   }
   return false;
 }
 
 /** Validate + downgrade. Returns {clean, downgraded: [{text, reason}]} */
-export function validateChecklist(checklist, profileBody) {
+export function validateChecklist(checklist, profileBody, profileSkills = []) {
   const downgraded = [];
   const requirements = (Array.isArray(checklist?.requirements) ? checklist.requirements : [])
     .map((req) => {
       const verdict = ['met', 'partial', 'missing'].includes(req?.verdict) ? req.verdict : 'missing';
-      if (verdict === 'met' && !evidenceBacked(req?.evidence, profileBody)) {
+      if (verdict === 'met' && !evidenceBacked(req?.evidence, profileBody, profileSkills)) {
         downgraded.push({ text: req?.text || '', reason: 'met without a profile.md quote' });
         return { ...req, verdict: 'partial' };
       }
@@ -73,7 +96,7 @@ export function validateChecklist(checklist, profileBody) {
   let domain = null;
   if (checklist?.domain) {
     const verdict = ['met', 'partial', 'missing'].includes(checklist.domain.verdict) ? checklist.domain.verdict : 'missing';
-    if (verdict === 'met' && !evidenceBacked(checklist.domain.evidence, profileBody)) {
+    if (verdict === 'met' && !evidenceBacked(checklist.domain.evidence, profileBody, profileSkills)) {
       downgraded.push({ text: '(domain)', reason: 'met without a profile.md quote' });
       domain = { ...checklist.domain, verdict: 'partial' };
     } else {
@@ -147,7 +170,7 @@ export function totalCompMultiplier(profile, level, stage) {
   if (!multipliers || typeof multipliers !== 'object') return 1; // no table → 1.0, comp scored as base
   const lvl = String(level || '').toLowerCase();
   const stg = String(stage || '').toLowerCase();
-  for (const key of [`${lvl}@${stg}`, stg ? `${lvl}@${stg}` : null, lvl, 'default']) {
+  for (const key of [stg ? `${lvl}@${stg}` : null, lvl, 'default']) {
     if (key && Number.isFinite(Number(multipliers[key]))) return Number(multipliers[key]);
   }
   return Number.isFinite(Number(multipliers.default)) ? Number(multipliers.default) : 1;
@@ -157,11 +180,15 @@ export function compScore(signals, profile, level, stage) {
   const salary = signals.salary; // {min,max,currency} | null
   const minTotal = Number(profile.comp?.min_total);
   if (!salary || !Number.isFinite(minTotal) || minTotal <= 0) return { pct: null, est: false, ratio: null };
-  const currencyMatches = !profile.comp?.currency || profile.comp.currency === salary.currency;
+  // A salary in another currency can't be compared without an exchange
+  // rate: unknown (neutral), never a low score.
+  if (profile.comp?.currency && salary.currency && profile.comp.currency !== salary.currency) {
+    return { pct: null, est: false, ratio: null, currencyMismatch: `${salary.currency} vs ${profile.comp.currency}` };
+  }
   const multiplier = totalCompMultiplier(profile, level, stage);
   const est = multiplier !== 1;
   const mid = (salary.min + salary.max) / 2;
-  const total = mid * (currencyMatches ? multiplier : 1); // wrong currency: score base, flag nothing
+  const total = mid * multiplier;
   const ratio = total / minTotal;
   let pct;
   if (ratio >= 1) pct = 100;
@@ -186,9 +213,10 @@ export function detectKnockouts(signals, job, profile) {
   if (db.onsite_only && signals.workMode?.onsite_only) {
     kos.push('on-site only');
   }
+  // No `languages` in the profile = unknown, not "speaks nothing".
   const requiredLangs = signals.requiredLanguages || [];
   const known = (profile.languages || []).map((l) => String(l).toLowerCase());
-  const missingLangs = requiredLangs.filter((l) => !known.includes(l));
+  const missingLangs = known.length > 0 ? requiredLangs.filter((l) => !known.includes(l)) : [];
   if (missingLangs.length > 0) {
     kos.push(`required language missing: ${missingLangs.join(', ')}`);
   }
@@ -281,6 +309,14 @@ export function buildSignals(jdText, job, profile, { profileBody, stage } = {}) 
   };
 }
 
+/** Replace the previous score's recheck/knockout notes instead of piling
+ * them up on every re-score; everything else in notes is kept. */
+export function scoreNotes(existing, fresh) {
+  const kept = String(existing || '').split(' | ')
+    .filter((part) => part && !/^(recheck|knockout):/.test(part.trim()));
+  return [...kept, ...(fresh.length > 0 ? [fresh.join('; ')] : [])].join(' | ');
+}
+
 // ── CLI ─────────────────────────────────────────────────────────────────
 
 async function main(argv) {
@@ -318,7 +354,7 @@ async function main(argv) {
     process.exit(1);
   }
 
-  const { clean, downgraded } = validateChecklist(checklist, profileBody);
+  const { clean, downgraded } = validateChecklist(checklist, profileBody, profile.skills);
   if (downgraded.length > 0) {
     for (const d of downgraded) console.error(`⬇️  downgraded to partial: "${d.text}" — ${d.reason}`);
   }
@@ -360,7 +396,7 @@ async function main(argv) {
   updateJobs(root, job.id, {
     fit: String(score.fit),
     breakdown: score.breakdown,
-    ...(notes.length > 0 ? { notes: job.notes ? `${job.notes} | ${notes.join('; ')}` : notes.join('; ') } : {}),
+    notes: scoreNotes(job.notes, notes),
   });
 
   console.log(JSON.stringify({

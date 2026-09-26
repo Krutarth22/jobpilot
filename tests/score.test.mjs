@@ -50,7 +50,7 @@ test('checklist: met without a profile.md quote is downgraded to partial', () =>
     ],
     domain: { verdict: 'met', evidence: 'invented' },
   };
-  const { clean, downgraded } = validateChecklist(checklist, PROFILE_BODY);
+  const { clean, downgraded } = validateChecklist(checklist, PROFILE_BODY, PROFILE.skills);
   assert.equal(downgraded.length, 2);
   assert.equal(clean.requirements[0].verdict, 'partial');
   assert.equal(clean.requirements[1].verdict, 'met'); // quoted → stays met

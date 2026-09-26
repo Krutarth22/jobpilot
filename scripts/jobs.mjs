@@ -4,7 +4,7 @@
 //
 //   jobs.mjs list [--status new|applied|closed] [--unscored] [--ranked]
 //   jobs.mjs show <id>
-//   jobs.mjs get <id> --jd        fetch + print the full job description
+//   jobs.mjs get <id> --jd [--refresh]   print the full job description (cached in evals/<id>.jd.txt)
 //   jobs.mjs score <id> <0-100> "<reason>"
 //   jobs.mjs status <id> <new|applied|closed>
 //   jobs.mjs note <id> "<text>"      appends to notes (never overwrites)
@@ -13,13 +13,13 @@
 //   jobs.mjs outcome <id> interview|rejected|offer|ghosted
 //   jobs.mjs stats                   interview rate by fit bucket (scoring health)
 
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import yaml from 'js-yaml';
 import {
-  workspaceRoot, readJobs, writeJobs, updateJobs, findJob, STATUSES, OUTCOMES, readEval, writeEval,
+  workspaceRoot, readJobs, writeJobs, updateJobs, findJob, STATUSES, OUTCOMES, readEval, writeEval, evalsPath,
 } from './lib/workspace.mjs';
 import { isMainModule } from './lib/main.mjs';
-import { loadProfile } from './lib/profile.mjs';
 import { rankAll } from './lib/rank.mjs';
 import { sweepClosed, SWEEP_DEFAULT_LIMIT } from './lib/sweep.mjs';
 import { statsByBucket } from './lib/learn.mjs';
@@ -61,7 +61,26 @@ export function htmlToText(html) {
     .trim();
 }
 
-export async function fetchDescription(root, job) {
+export const jdCachePath = (root, id) => `${evalsPath(root)}/${id}.jd.txt`;
+
+/**
+ * The job description, cached per job in evals/<id>.jd.txt. match fetches
+ * it, then score.mjs needs it again — and Ashby/Lever can only return a
+ * description by downloading the company's whole board. An empty result is
+ * never cached, so a later fetch can still succeed.
+ */
+export async function fetchDescription(root, job, { refresh = false } = {}) {
+  const cache = jdCachePath(root, job.id);
+  if (!refresh && existsSync(cache)) return readFileSync(cache, 'utf8');
+  const text = await fetchDescriptionUncached(root, job);
+  if (text.trim()) {
+    mkdirSync(evalsPath(root), { recursive: true });
+    writeFileSync(cache, text);
+  }
+  return text;
+}
+
+async function fetchDescriptionUncached(root, job) {
   const companies = yaml.load(await readFile(`${root}/companies.yml`, 'utf8')).companies || [];
   const entry = findEntry(companies, job.company);
   if (!entry || !PROVIDERS[entry.provider]) {
@@ -108,14 +127,15 @@ async function main(argv) {
     const { unscored, status, ranked } = parseListArgs(rest);
     if (status && !STATUSES.includes(status)) usage(`status must be one of: ${STATUSES.join(', ')}`);
     if (ranked) {
-      // rank = fit × freshness × comp factor (lib/rank.mjs); persists ranks.
-      const { profile } = loadProfile(root);
-      const rankById = new Map(rankAll(jobs, profile).map(({ job, rank }) => [job.id, String(rank)]));
+      // rank = fit × freshness (lib/rank.mjs); persists ranks.
+      const order = rankAll(jobs);
+      const rankById = new Map(order.map(({ job, rank }) => [job.id, String(rank)]));
       for (const j of jobs) j.rank = j.fit === '' ? '' : (rankById.get(j.id) ?? ''); // unscored → no rank yet
       writeJobs(root, jobs);
+      const position = new Map(order.map(({ job }, i) => [job.id, i]));
+      jobs.sort((a, b) => position.get(a.id) - position.get(b.id)); // unscored: freshest first
     }
     const rows = jobs.filter((j) => (!status || j.status === status) && (!unscored || j.fit === ''));
-    if (ranked) rows.sort((a, b) => (Number(b.rank) || 0) - (Number(a.rank) || 0));
     console.log(`${rows.length} job(s)`);
     for (const j of rows) {
       const head = ranked ? `#${j.id}\trank ${j.rank || '-'}\tfit ${j.fit || '-'}\t${j.status}` : `#${j.id}\t${j.fit || '-'}\t${j.status}`;
@@ -158,7 +178,7 @@ async function main(argv) {
     printJob(job);
   } else if (cmd === 'get') {
     if (!rest.includes('--jd')) usage('get needs --jd (job description)');
-    process.stdout.write(await fetchDescription(root, job));
+    process.stdout.write(await fetchDescription(root, job, { refresh: rest.includes('--refresh') }));
   } else if (cmd === 'score') {
     const score = Number(rest[1]);
     const reason = rest.slice(2).join(' ').trim();
