@@ -11,6 +11,7 @@
 // forced to "You": this is never a report about someone else.
 //
 //   node claims.mjs validate <report.json>
+//   node claims.mjs save <draft.json>      validate, stamp profile_sha256, write <workspace>/claims.json
 //   node claims.mjs render <report.json> <out.pdf>
 //   node claims.mjs for-job <id>
 //
@@ -337,7 +338,8 @@ function buildHtml(report) {
 
 // ── for-job: which claims are relevant to this posting ───────────────────
 
-const STOPWORDS = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'have', 'will', 'your', 'you', 'are', 'was', 'were', 'been', 'has', 'had']);
+const STOPWORDS = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'have', 'will', 'your', 'you', 'are', 'was', 'were', 'been', 'has', 'had',
+  'experience', 'years', 'year', 'work', 'working', 'team', 'teams', 'strong', 'ability', 'across', 'including']);
 
 function significantWords(text) {
   return new Set(String(text || '').toLowerCase().match(/[a-z][a-z0-9+.#-]{3,}/g)?.filter((w) => !STOPWORDS.has(w)) || []);
@@ -351,7 +353,11 @@ function significantWords(text) {
  * should surface them even on a weaker match.
  */
 export function claimsForJob(claims, checklist) {
-  const requirements = Array.isArray(checklist?.requirements) ? checklist.requirements : [];
+  const all = Array.isArray(checklist?.requirements) ? checklist.requirements : [];
+  // Must-haves are what a recruiter screens on; fall back to everything only
+  // when the checklist doesn't mark types.
+  const must = all.filter((r) => r.type === 'must');
+  const requirements = must.length > 0 ? must : all;
   const requirementText = requirements.map((r) => r.text || '').join(' ');
   const mustHaveSkills = new Set([...extractSkills(requirementText)].map((s) => s.toLowerCase()));
   const requirementWords = significantWords(requirementText);
@@ -377,6 +383,22 @@ async function cmdValidate(rest) {
   console.log(JSON.stringify(report, null, 2));
 }
 
+async function cmdSave(rest) {
+  const [file] = rest;
+  if (!file) { console.error('Usage: node claims.mjs save <draft.json>'); process.exit(1); }
+  const root = workspaceRoot();
+  const raw = JSON.parse(await readFile(file, 'utf8'));
+  // Stamp before validating so the stored file is exactly what validated.
+  // counts/percentages are never stored: they're re-derived on every load.
+  const stamped = { ...raw, profile_sha256: hashProfile(root) };
+  delete stamped.counts;
+  delete stamped.percentages;
+  const report = validateClaims(stamped);
+  await writeFile(claimsPath(root), `${JSON.stringify(stamped, null, 2)}\n`);
+  const flagged = report.claims.filter((c) => c.assessment === 'Needs clarification' || c.assessment === 'Material inconsistency').length;
+  console.log(`✅ saved ${claimsPath(root)} — ${report.claims.length} claims, ${flagged} flagged`);
+}
+
 async function cmdRender(rest) {
   const [inputPath, outputPath] = rest;
   if (!inputPath || !outputPath) { console.error('Usage: node claims.mjs render <report.json> <out.pdf>'); process.exit(1); }
@@ -397,8 +419,9 @@ async function cmdForJob(rest) {
   }
   const report = validateClaims(JSON.parse(await readFile(path, 'utf8')));
   const currentHash = hashProfile(root);
-  if (report.profile_sha256 && currentHash && report.profile_sha256 !== currentHash) {
-    console.error('claims.json is stale — profile.md changed since the last self-check. Rebuild it before trusting these results.');
+  // No stamp means we can't tell which profile it was built from — treat as stale.
+  if (currentHash && report.profile_sha256 !== currentHash) {
+    console.error('claims.json is stale — profile.md changed since the last self-check (or it was never stamped). Rebuild it and save with `claims.mjs save`.');
     process.exit(2);
   }
   const job = findJob(root, id);
@@ -414,9 +437,10 @@ async function cmdForJob(rest) {
 async function main(argv) {
   const [cmd, ...rest] = argv;
   if (cmd === 'validate') return cmdValidate(rest);
+  if (cmd === 'save') return cmdSave(rest);
   if (cmd === 'render') return cmdRender(rest);
   if (cmd === 'for-job') return cmdForJob(rest);
-  console.error('Usage: node claims.mjs <validate|render|for-job> ...');
+  console.error('Usage: node claims.mjs <validate|save|render|for-job> ...');
   process.exit(1);
 }
 

@@ -40,8 +40,12 @@ tailored resume that passes the fact gate and an ATS round-trip.
      2. Check internal consistency first (do the dates line up across sections, does a metric appear the same way twice) before reaching for anything external.
      3. Only then check your **own** links — `profile.md`'s `links:` front matter (GitHub, website, LinkedIn, `other`). A link that's missing makes that claim `Not assessable`, never adverse.
      4. **Ask the user before any wider web search.** A search-result snippet is never evidence by itself — only something you can actually open and read counts.
-     5. Write `<workspace>/claims.json`: a report matching `report-schema`-style claims (`id`, `category`, `claim`, `assessment`, `confidence`, `observations`, `inference`, `evidence`, `alternative_explanations`, `follow_up_questions`, `next_step`), plus `profile_sha256` — sha256 of the current `profile.md` text (this is what lets `for-job` detect a stale build later). `candidate_label` can be anything; `validate` forces it to `"You"`.
-     6. Validate it: `node "<pluginRoot>/scripts/claims.mjs" validate "<workspace>/claims.json"`. Fix and re-run on any error — never hand-wave past a validation failure.
+     5. Write the report to `<workspace>/out/claims-draft.json` — claims shaped per the rubric (`id`, `category`, `claim`, `assessment`, `confidence`, `observations`, `inference`, `evidence`, `alternative_explanations`, `follow_up_questions`, `next_step`) plus the top-level fields it lists. Don't compute `counts`, `percentages` or any hash yourself.
+     6. Save it — this validates, stamps the profile hash (so a later profile edit marks it stale) and writes `<workspace>/claims.json`:
+        ```sh
+        node "<pluginRoot>/scripts/claims.mjs" save "<workspace>/out/claims-draft.json"
+        ```
+        Fix and re-run on any error — never hand-wave past a validation failure.
    - Run `node "<pluginRoot>/scripts/claims.mjs" for-job <id>` and present each returned claim: its plain label (never the internal value), what was found, the question a recruiter would likely ask, and a suggested fix — add a link, reword the claim, or prep an answer for the interview.
    - **Rule:** no rewritten bullet may ever strengthen a claim flagged `Needs clarification` or `Material inconsistency` — e.g. "Contributed to X" must not become "Built X" just because it reads better.
    - Offer an optional PDF: `node "<pluginRoot>/scripts/claims.mjs" render "<workspace>/claims.json" "<workspace>/out/claims-report.pdf"`.

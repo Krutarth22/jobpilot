@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -276,4 +276,51 @@ Python, React.
   const parsed = JSON.parse(out);
   assert.equal(parsed.ok, true); // fact gate unaffected by the advisory warning
   assert.ok(parsed.claimWarnings.length > 0);
+});
+
+// ── review fixes: save stamps the hash; unstamped = stale; must-haves only ──
+
+test('save: stamps profile_sha256 and writes claims.json that for-job accepts', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jobpilot-claims-save-'));
+  writeJobs(root, [{ id: '1', company: 'Acme', title: 'Backend Engineer', url: 'https://a/1', status: 'new' }]);
+  writeFileSync(profilePath(root), '## Experience\nLed the Kubernetes migration at Acme.');
+  writeEval(root, '1', { checklist: { requirements: [
+    { text: 'Kubernetes experience', type: 'must', category: 'skills', verdict: 'met' },
+  ] } });
+  const draft = {
+    report_version: '1.0', candidate_label: 'x', review_date: '2026-09-02',
+    reviewed_inputs: ['Resume'], overall_conclusion: 'No material issues found',
+    summary: 'ok', sources: [], limitations: [],
+    claims: [{ id: 'C1', category: 'Skills', claim: 'Owned the Kubernetes migration', assessment: 'Supported', confidence: 'High', observations: ['x'], inference: 'x', evidence: [{ source: 's', finding: 'f' }], alternative_explanations: [], follow_up_questions: [], next_step: 'none' }],
+  };
+  const draftPath = join(root, 'draft.json');
+  writeFileSync(draftPath, JSON.stringify(draft));
+  runClaims(root, 'save', draftPath);
+  const saved = JSON.parse(readFileSync(claimsPath(root), 'utf8'));
+  assert.equal(saved.profile_sha256, hashProfile(root));
+  assert.equal(saved.counts, undefined); // derived on load, never stored
+  const out = JSON.parse(runClaims(root, 'for-job', '1'));
+  assert.ok(out.claims.some((c) => c.id === 'C1'));
+});
+
+test('for-job: an unstamped claims.json is treated as stale', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jobpilot-claims-cli-'));
+  writeJobs(root, [{ id: '1', company: 'Acme', title: 'Engineer', url: 'https://a/1', status: 'new' }]);
+  writeFileSync(profilePath(root), '## Experience\nLed the platform team.');
+  writeFileSync(claimsPath(root), JSON.stringify({
+    report_version: '1.0', candidate_label: 'x', review_date: '2026-09-02',
+    reviewed_inputs: ['Resume'], overall_conclusion: 'No material issues found',
+    summary: 'ok', sources: [], limitations: [],
+    claims: [{ id: 'C1', category: 'Employment', claim: 'Led the platform team', assessment: 'Supported', confidence: 'High', observations: ['x'], inference: 'x', evidence: [{ source: 's', finding: 'f' }], alternative_explanations: [], follow_up_questions: [], next_step: 'none' }],
+  }));
+  assert.throws(() => runClaims(root, 'for-job', '1'), (err) => err.status === 2);
+});
+
+test('claimsForJob: nice-to-haves are ignored when must-haves exist', async () => {
+  const report = validateClaims(await loadFixture('mixed-evidence'));
+  const checklist = { requirements: [
+    { text: 'People management of 5+ engineers', type: 'must', category: 'seniority', verdict: 'met' },
+    { text: 'React and Node.js', type: 'nice', category: 'skills', verdict: 'met' },
+  ] };
+  assert.ok(!claimsForJob(report.claims, checklist).some((c) => c.id === 'C1'));
 });
