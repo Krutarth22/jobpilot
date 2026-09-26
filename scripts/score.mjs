@@ -17,6 +17,7 @@
 // not evidence.
 
 import { readFile } from 'node:fs/promises';
+import yaml from 'js-yaml';
 import {
   workspaceRoot, findJob, updateJobs, readEval, writeEval,
 } from './lib/workspace.mjs';
@@ -323,7 +324,14 @@ async function main(argv) {
   }
 
   const jdText = await fetchDescription(root, job);
-  const signals = buildSignals(jdText, job, profile, { profileBody });
+  // Company stage for the total-comp multiplier (A5): optional `stage:` on the
+  // companies.yml entry ("public" | "startup" | ...).
+  let stage = null;
+  try {
+    const companies = yaml.load(await readFile(`${root}/companies.yml`, 'utf8')).companies || [];
+    stage = companies.find((c) => String(c.name).toLowerCase() === String(job.company).toLowerCase())?.stage || null;
+  } catch { /* stage stays null → multiplier falls back to level/default */ }
+  const signals = buildSignals(jdText, job, profile, { profileBody, stage });
   const score = computeScore(clean, signals, profile);
 
   const prior = readEval(root, job.id) || {};
