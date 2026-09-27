@@ -69,7 +69,7 @@ generates traces back to `profile.md` — build it carefully.
 8. **Discover companies from the confirmed targets.** Follow "Discover" in the scan skill (`<pluginRoot>/skills/scan/SKILL.md`): queries from `discover.mjs --queries`, web search, then pipe the result URLs into `discover.mjs`. This adds companies hiring for the user's roles beyond the seed list — essential when their field isn't tech. Report what was added.
 
 9. **Calibrate total comp (only if the user set `comp.min_total`).** Postings list base pay, so the scorer estimates total pay as base × a multiplier. Look up real figures instead of guessing:
-   - Pick 8–15 companies from `companies.yml` across the kinds of employer on the list, and look up the median **base** and **total** pay for the user's level and role family at each. Choose the source by field:
+   - Pick 8–15 companies from `companies.yml` across the kinds of employer on the list, and look up the median **base** and **total** pay for the user's level and role family at each. If the user's title sits between two scorer levels (e.g. Associate Director: `senior-manager` or `director`), or they're targeting both, look up both and set `"level"` on each lookup. Postings are then estimated with the ratio for their own level. Choose the source by field:
      - **Tech:** levels.fyi (company page, filtered to the role and level)
      - **Finance:** levels.fyi where it covers the firm; otherwise published bonus surveys or Glassdoor "total pay"
      - **Healthcare, government, education, nonprofit:** Glassdoor, Payscale, BLS or published pay scales. Total is usually close to base.

@@ -203,7 +203,8 @@ export function locationScore(signals, job, profile) {
 /** Total comp (A5): base × multiplier vs comp.min_total.
  * Posted ranges are base-only; offers are scored on total. The multiplier is
  * the most specific key present, in this order:
- *   company:<name>   this company's total/base ratio (comp.mjs calibrate, from levels.fyi)
+ *   company:<name>@<level>  this company's ratio at this level (comp.mjs calibrate)
+ *   company:<name>   this company's total/base ratio (comp.mjs calibrate)
  *   <level>@<stage>  hand-set, e.g. manager@public
  *   stage:<stage>    median ratio of that stage (comp.mjs calibrate)
  *   <level>
@@ -215,7 +216,7 @@ export function totalCompMultiplier(profile, level, stage, company) {
   const lvl = String(level || '').toLowerCase();
   const stg = String(stage || '').toLowerCase();
   const co = String(company || '').trim().toLowerCase();
-  const keys = [co ? `company:${co}` : null, lvl && stg ? `${lvl}@${stg}` : null, stg ? `stage:${stg}` : null, lvl || null, 'default'];
+  const keys = [co && lvl ? `company:${co}@${lvl}` : null, co ? `company:${co}` : null, lvl && stg ? `${lvl}@${stg}` : null, stg ? `stage:${stg}` : null, lvl || null, 'default'];
   for (const key of keys) {
     if (key && byKey.has(key) && Number.isFinite(Number(byKey.get(key)))) return Number(byKey.get(key));
   }

@@ -10,10 +10,16 @@
 // agent made — levels.fyi for tech, Glassdoor/Payscale, BLS, published pay
 // scales, bonus surveys for finance — into that table:
 //
-//   company:<Name>   that company's own total/base ratio
-//   stage:<type>     median ratio for a company type (public, startup, bank,
-//                    hedge-fund, hospital, government, … — any label)
-//   default          median over every lookup (needs ≥3)
+//   company:<Name>          that company's own total/base ratio
+//   stage:<type>            median ratio for a company type (public, startup,
+//                           bank, hedge-fund, hospital, government, … — any label)
+//   default                 median over every lookup (needs ≥3)
+//
+// A lookup may name the scorer level it was made for ("level":
+// "senior-manager"); then the level-specific keys are written too, so a
+// Director posting is estimated with Director ratios:
+//
+//   company:<Name>@<level>  <level>@<type>  <level>
 //
 // and tags each looked-up company in companies.yml with its type. Hand-set
 // keys (manager@public, a level) are kept. The lookups file:
@@ -22,6 +28,7 @@
 //     "companies": [
 //       { "company": "Stripe", "stage": "public", "base": 290000, "total": 520000 },
 //       { "company": "Mount Sinai", "stage": "hospital", "base": 240000, "total": 252000, "source": "Glassdoor" },
+//       { "company": "Stripe", "stage": "public", "level": "director", "base": 330000, "total": 700000 },
 //       { "company": "Figma", "stage": "public" }            // type only, no pay data
 //     ] }
 //
@@ -35,6 +42,7 @@ import { workspaceRoot, companiesPath, profilePath } from './lib/workspace.mjs';
 import { isMainModule } from './lib/main.mjs';
 import { loadProfile, setFrontmatterField } from './lib/profile.mjs';
 import { entryLine, saveCompanies } from './verify-boards.mjs';
+import { LEVELS } from './lib/signals.mjs';
 
 const MAX_RATIO = 5;
 const MIN_FOR_DEFAULT = 3;
@@ -58,7 +66,9 @@ export function computeMultipliers(lookups) {
     const company = String(raw?.company || '').trim();
     if (!company) { rejected.push({ company: '', reason: 'no company name' }); continue; }
     const stage = slugStage(raw.stage);
-    if (stage) stages.push({ company, stage });
+    if (stage && !stages.some((x) => x.company.toLowerCase() === company.toLowerCase())) stages.push({ company, stage });
+    const level = raw.level == null || raw.level === '' ? '' : String(raw.level).trim().toLowerCase();
+    if (level && !LEVELS.includes(level)) { rejected.push({ company, reason: `unknown level "${raw.level}" (use: ${LEVELS.join(', ')})` }); continue; }
     const hasPay = raw.base != null || raw.total != null;
     if (!hasPay) continue;
     const base = Number(raw.base);
@@ -67,18 +77,28 @@ export function computeMultipliers(lookups) {
     const ratio = total / base;
     if (ratio < 1) { rejected.push({ company, reason: `total ${total} is below base ${base}` }); continue; }
     if (ratio > MAX_RATIO) { rejected.push({ company, reason: `ratio ${round2(ratio)} is above ${MAX_RATIO}× — check the figures` }); continue; }
-    accepted.push({ company, stage, base, total, ratio: round2(ratio), source: String(raw.source || defaultSource || 'unknown') });
+    accepted.push({ company, stage, level, base, total, ratio: round2(ratio), source: String(raw.source || defaultSource || 'unknown') });
   }
 
-  const multipliers = {};
-  for (const a of accepted) multipliers[`company:${a.company}`] = a.ratio;
-  const byStage = new Map();
-  for (const a of accepted.filter((x) => x.stage)) byStage.set(a.stage, [...(byStage.get(a.stage) || []), a.ratio]);
-  const stageSummary = [];
-  for (const [stage, ratios] of [...byStage].sort()) {
-    multipliers[`stage:${stage}`] = round2(median(ratios));
-    stageSummary.push({ stage, ratio: multipliers[`stage:${stage}`], n: ratios.length });
+  // Median ratio per key; every lookup feeds its level-free keys too, so a
+  // posting at a level nobody looked up still gets the company's own ratio.
+  const groups = new Map();
+  const add = (key, ratio) => groups.set(key, [...(groups.get(key) || []), ratio]);
+  for (const a of accepted) {
+    add(`company:${a.company}`, a.ratio);
+    if (a.stage) add(`stage:${a.stage}`, a.ratio);
+    if (a.level) {
+      add(`company:${a.company}@${a.level}`, a.ratio);
+      if (a.stage) add(`${a.level}@${a.stage}`, a.ratio);
+      add(a.level, a.ratio);
+    }
   }
+  const multipliers = {};
+  for (const [key, ratios] of groups) multipliers[key] = round2(median(ratios));
+  const stageSummary = [...groups]
+    .filter(([key]) => key.startsWith('stage:') || (!key.startsWith('company:') && key.includes('@')) || LEVELS.includes(key))
+    .map(([key, ratios]) => ({ stage: key.replace(/^stage:/, ''), ratio: multipliers[key], n: ratios.length }))
+    .sort((a, b) => a.stage.localeCompare(b.stage));
   const def = accepted.length >= MIN_FOR_DEFAULT ? round2(median(accepted.map((a) => a.ratio))) : null;
   if (def !== null) multipliers.default = def;
 
@@ -154,9 +174,9 @@ export async function calibrate(root, lookups, { dryRun = false, today = new Dat
 // ── CLI ─────────────────────────────────────────────────────────────────
 
 function table(summary) {
-  const rows = summary.accepted.map((a) => `  ${a.company.padEnd(24)} ${(a.stage || '-').padEnd(14)} ${String(a.base).padStart(9)} ${String(a.total).padStart(9)}  ×${a.ratio.toFixed(2)}  (${a.source})`);
-  const out = [`  ${'company'.padEnd(24)} ${'type'.padEnd(14)} ${'base'.padStart(9)} ${'total'.padStart(9)}  ratio`, ...rows];
-  for (const s of summary.stages) out.push(`  type ${s.stage}: ×${s.ratio.toFixed(2)} (median of ${s.n})`);
+  const rows = summary.accepted.map((a) => `  ${a.company.padEnd(22)} ${(a.stage || '-').padEnd(12)} ${(a.level || '-').padEnd(15)} ${String(a.base).padStart(8)} ${String(a.total).padStart(8)}  ×${a.ratio.toFixed(2)}  (${a.source})`);
+  const out = [`  ${'company'.padEnd(22)} ${'type'.padEnd(12)} ${'level'.padEnd(15)} ${'base'.padStart(8)} ${'total'.padStart(8)}  ratio`, ...rows];
+  for (const s of summary.stages) out.push(`  ${s.stage}: ×${s.ratio.toFixed(2)} (median of ${s.n})`);
   out.push(`  default: ${summary.default === null ? 'none' : `×${Number(summary.default).toFixed(2)}`}${summary.defaultComputed ? '' : ' (kept — fewer than 3 lookups)'}`);
   for (const r of summary.rejected) out.push(`  ✖ ${r.company || '(unnamed)'}: ${r.reason}`);
   if (summary.notInCompanies.length > 0) out.push(`  ⚠️  not in companies.yml (type not saved): ${summary.notInCompanies.join(', ')}`);

@@ -43,6 +43,29 @@ test('computeMultipliers: fewer than 3 lookups → no default (old one kept by m
   assert.equal(comp.calibrated.date, '2026-09-27');
 });
 
+test('computeMultipliers: level-tagged lookups add level keys; level-free keys use every level', () => {
+  const r = computeMultipliers({ companies: [
+    { company: 'Stripe', stage: 'public', level: 'senior-manager', base: 300000, total: 540000 },
+    { company: 'Stripe', stage: 'public', level: 'director', base: 350000, total: 770000 },
+    { company: 'Rula', stage: 'startup', level: 'Director', base: 280000, total: 336000 },
+    { company: 'X', level: 'vp', base: 1, total: 2 },
+  ] });
+  assert.equal(r.multipliers['company:Stripe@senior-manager'], 1.8);
+  assert.equal(r.multipliers['company:Stripe@director'], 2.2);
+  assert.equal(r.multipliers['company:Stripe'], 2); // median of both levels
+  assert.equal(r.multipliers['director@public'], 2.2);
+  assert.equal(r.multipliers['director@startup'], 1.2);
+  assert.equal(r.multipliers.director, 1.7);
+  assert.equal(r.multipliers['senior-manager'], 1.8);
+  assert.equal(r.multipliers['stage:public'], 2);
+  assert.equal(r.multipliers.default, 1.8);
+  assert.match(r.rejected[0].reason, /unknown level "vp"/);
+  const p = { comp: { multipliers: r.multipliers } };
+  assert.equal(totalCompMultiplier(p, 'director', 'public', 'Stripe'), 2.2);
+  assert.equal(totalCompMultiplier(p, 'staff', 'public', 'Stripe'), 2); // no staff lookup → company overall
+  assert.equal(totalCompMultiplier(p, 'director', 'startup', 'Other'), 1.2);
+});
+
 test('totalCompMultiplier: company, then level@stage, then stage:, then level, then default', () => {
   const profile = { comp: { multipliers: { 'company:Stripe': 1.8, 'manager@public': 1.6, 'stage:public': 1.7, manager: 1.3, default: 1.1 } } };
   assert.equal(totalCompMultiplier(profile, 'manager', 'public', 'stripe'), 1.8);
