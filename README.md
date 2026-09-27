@@ -159,9 +159,16 @@ The AI reads the job post and lists its requirements. For each one it says wheth
 | Seniority | 25 | Your level and years of experience compared with what the job asks |
 | Domain | 15 | Whether you've worked in this kind of product or industry |
 | Location | 15 | Remote, hybrid or on-site, compared with what you want |
-| Pay | 10 | The listed salary compared with your target (base pay is converted to an estimated total) |
+| Pay | 10 | The listed salary compared with your minimum base pay and your minimum total pay |
 
 Next to each score you'll see a short breakdown such as `S22/35 Sn20/25 D10/15 L15/15 C?/10`: the points earned out of each weight. A `?` means that information wasn't available, and it counts as neutral rather than zero.
+
+**How pay is judged.** Job posts usually list base pay only, but offers include bonus and stock. So during setup jobpilot looks up real pay for your level at a sample of your companies and learns how much bigger total pay is than base at each kind of employer:
+- **Tech:** levels.fyi
+- **Finance:** levels.fyi or bonus surveys
+- **Healthcare, government and nonprofits:** Glassdoor, Payscale or published pay scales, where total is usually close to base
+
+You see the numbers before they're saved. A job whose base can't reach your minimum base scores low however big the bonus, and its breakdown shows `<base`. Estimates are marked `est.`.
 
 **Deal-breakers** (on-site only when you want remote, sponsorship needed but not offered, a security clearance, a language you don't speak, or a big seniority mismatch) cap the score at 40, however good the rest looks.
 
@@ -229,6 +236,8 @@ Each job has one of three statuses: **new → applied → closed**. When you hea
 
 Want the folder somewhere else? Set `JOBPILOT_HOME=/path/you/like`.
 
+**Start over anytime** with `/jobpilot:reset`, for example for a new resume or a career change. Your current folder is moved to `~/jobpilot-backup-<date>` and setup runs again from scratch. Nothing is deleted, so you can always go back.
+
 ---
 
 ## FAQ
@@ -238,7 +247,7 @@ Want the folder somewhere else? Set `JOBPILOT_HOME=/path/you/like`.
 
 Company career pages hosted on **Greenhouse**, **Lever** and **Ashby**, which together cover thousands of tech companies. It starts with 101 companies, including Stripe, Figma, Ramp and Palantir, all checked to be live, and adds more that fit your background during setup. You can add any company that uses one of these three systems to `companies.yml`.
 
-LinkedIn, Indeed and Workday aren't supported yet.
+LinkedIn, Indeed and Workday aren't supported yet. That matters most outside tech: many hospitals, banks and large companies post jobs on Workday, iCIMS or Taleo. Setup still finds the employers in your field that use Greenhouse, Lever or Ashby, but the list will be shorter than for tech roles.
 </details>
 
 <details>

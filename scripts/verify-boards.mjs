@@ -87,7 +87,7 @@ export async function discoverBoard(name, { providers = Object.keys(PROVIDERS), 
 
 // ── Comment-preserving companies.yml edits ─────────────────────────────
 
-function entryLine(entry) {
+export function entryLine(entry) {
   const flow = yaml.dump(entry, { flowLevel: 0, lineWidth: -1 }).trim(); // {name: X, …}
   return `  - ${flow.replace(/^\{/, '{ ').replace(/\}$/, ' }')}`;
 }

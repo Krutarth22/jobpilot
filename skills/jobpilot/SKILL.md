@@ -5,7 +5,7 @@ description: Job search copilot — set up from one resume, scan Greenhouse/Leve
 
 # jobpilot
 
-A small job-search pipeline. Five modes plus one-time setup:
+A small job-search pipeline. Five modes plus one-time setup (and reset to start over):
 
 | Command | What it does |
 |---|---|
@@ -15,6 +15,7 @@ A small job-search pipeline. Five modes plus one-time setup:
 | `/jobpilot:review <job>` | Recruiter's view of your profile for that job + optional tailored PDF |
 | `/jobpilot:contact <job>` | Find the hiring manager/recruiter, draft a ≤300-char LinkedIn note |
 | `/jobpilot:apply <job>` | Open the form, fill it, upload the resume — **stop before Submit** |
+| `/jobpilot:reset` | Start over from scratch: move the workspace to a dated backup, then run setup again |
 
 ## How to run the scripts
 

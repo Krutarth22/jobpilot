@@ -10,7 +10,7 @@
 //   skills: [python, pytorch, kubernetes]   # canonical names (see lib/skills.mjs)
 //   languages: [english]
 //   locations: { remote: preferred, cities: [New York], relocate: false }
-//   comp: { currency: USD, min_total: 350000, multipliers: { "manager@public": 1.6, default: 1.4 } }
+//   comp: { currency: USD, min_base: 250000, min_total: 350000, multipliers: { "company:Stripe": 1.8, "stage:public": 1.7, default: 1.4 } }
 //   deal_breakers: { onsite_only: true, needs_sponsorship: false, clearance: false }
 //   weights: { skills: 35, seniority: 25, domain: 15, location: 15, comp: 10 }
 //   anchors:
@@ -97,4 +97,35 @@ export function loadProfile(root) {
   if (!existsSync(p)) return { profile: normalizeProfile({}), body: '', hasFrontmatter: false, exists: false };
   const { frontmatter, body, hasFrontmatter } = parseProfile(readFileSync(p, 'utf8'));
   return { profile: normalizeProfile(frontmatter), body, hasFrontmatter, exists: true };
+}
+
+/**
+ * Set one top-level front matter field, rewriting only that field's lines
+ * (as one flow-style line) so the rest of profile.md — comments, other
+ * fields, prose — stays byte-for-byte. A missing field is added at the end
+ * of the front matter. Throws rather than write a file that no longer
+ * parses back to the intended value.
+ */
+export function setFrontmatterField(text, key, value) {
+  const src = String(text);
+  const match = src.match(/^(﻿?---[ \t]*\r?\n)([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n|$))/);
+  if (!match) throw new Error('profile.md has no front matter');
+  const [, open, fm, close] = match;
+  const flow = yaml.dump(value, { flowLevel: 0, lineWidth: -1 }).trim().replace(/^\{(.*)\}$/, '{ $1 }');
+  const line = `${key}: ${flow}`;
+  const lines = fm.split(/\r?\n/);
+  const start = lines.findIndex((l) => new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`).test(l));
+  if (start === -1) {
+    lines.push(line);
+  } else {
+    let end = start + 1;
+    while (end < lines.length && (/^\s+\S/.test(lines[end]) || (lines[end].trim() === '' && /^\s+\S/.test(lines[end + 1] || '')))) end++;
+    lines.splice(start, end - start, line);
+  }
+  const out = open + lines.join('\n') + close + src.slice(match[0].length);
+  const check = parseProfile(out);
+  if (!check.hasFrontmatter || JSON.stringify(check.frontmatter[key]) !== JSON.stringify(value)) {
+    throw new Error(`could not rewrite "${key}" in profile.md front matter safely`);
+  }
+  return out;
 }

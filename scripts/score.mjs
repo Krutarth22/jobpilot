@@ -200,38 +200,66 @@ export function locationScore(signals, job, profile) {
   return Math.round(modeScore);
 }
 
-/** Total comp (A5): base × level/stage multiplier vs comp.min_total.
- * Posted ranges are base-only; offers are scored on total. */
-export function totalCompMultiplier(profile, level, stage) {
+/** Total comp (A5): base × multiplier vs comp.min_total.
+ * Posted ranges are base-only; offers are scored on total. The multiplier is
+ * the most specific key present, in this order:
+ *   company:<name>   this company's total/base ratio (comp.mjs calibrate, from levels.fyi)
+ *   <level>@<stage>  hand-set, e.g. manager@public
+ *   stage:<stage>    median ratio of that stage (comp.mjs calibrate)
+ *   <level>
+ *   default */
+export function totalCompMultiplier(profile, level, stage, company) {
   const multipliers = profile.comp?.multipliers;
   if (!multipliers || typeof multipliers !== 'object') return 1; // no table → 1.0, comp scored as base
+  const byKey = new Map(Object.entries(multipliers).map(([k, v]) => [k.toLowerCase(), v]));
   const lvl = String(level || '').toLowerCase();
   const stg = String(stage || '').toLowerCase();
-  for (const key of [stg ? `${lvl}@${stg}` : null, lvl, 'default']) {
-    if (key && Number.isFinite(Number(multipliers[key]))) return Number(multipliers[key]);
+  const co = String(company || '').trim().toLowerCase();
+  const keys = [co ? `company:${co}` : null, lvl && stg ? `${lvl}@${stg}` : null, stg ? `stage:${stg}` : null, lvl || null, 'default'];
+  for (const key of keys) {
+    if (key && byKey.has(key) && Number.isFinite(Number(byKey.get(key)))) return Number(byKey.get(key));
   }
-  return Number.isFinite(Number(multipliers.default)) ? Number(multipliers.default) : 1;
+  return 1;
 }
 
-export function compScore(signals, profile, level, stage) {
+/** ≥1 → 100; 0.7–1 → 20–100; below 0.7 → 0–20. */
+function floorPct(ratio) {
+  if (ratio >= 1) return 100;
+  if (ratio >= 0.7) return 20 + ((ratio - 0.7) / 0.3) * 80;
+  return (ratio / 0.7) * 20;
+}
+
+/** Comp vs the profile's floors: estimated total (range midpoint × multiplier)
+ * against comp.min_total, and the top of the posted base range against
+ * comp.min_base. With both set, the lower of the two scores counts: a job
+ * whose base can't reach the floor scores low however rich the equity. */
+export function compScore(signals, profile, level, stage, company) {
   const salary = signals.salary; // {min,max,currency} | null
   const minTotal = Number(profile.comp?.min_total);
-  if (!salary || !Number.isFinite(minTotal) || minTotal <= 0) return { pct: null, est: false, ratio: null };
+  const minBase = Number(profile.comp?.min_base);
+  const hasTotal = Number.isFinite(minTotal) && minTotal > 0;
+  const hasBase = Number.isFinite(minBase) && minBase > 0;
+  if (!salary || (!hasTotal && !hasBase)) return { pct: null, est: false, ratio: null };
   // A salary in another currency can't be compared without an exchange
   // rate: unknown (neutral), never a low score.
   if (profile.comp?.currency && salary.currency && profile.comp.currency !== salary.currency) {
     return { pct: null, est: false, ratio: null, currencyMismatch: `${salary.currency} vs ${profile.comp.currency}` };
   }
-  const multiplier = totalCompMultiplier(profile, level, stage);
-  const est = multiplier !== 1;
-  const mid = (salary.min + salary.max) / 2;
-  const total = mid * multiplier;
-  const ratio = total / minTotal;
-  let pct;
-  if (ratio >= 1) pct = 100;
-  else if (ratio >= 0.7) pct = 20 + ((ratio - 0.7) / 0.3) * 80;
-  else pct = (ratio / 0.7) * 20;
-  return { pct: Math.round(clamp(pct)), est, ratio };
+  let pct = 100;
+  let est = false;
+  let ratio = null;
+  let baseRatio = null;
+  if (hasTotal) {
+    const multiplier = totalCompMultiplier(profile, level, stage, company);
+    est = multiplier !== 1;
+    ratio = ((salary.min + salary.max) / 2) * multiplier / minTotal;
+    pct = floorPct(ratio);
+  }
+  if (hasBase) {
+    baseRatio = salary.max / minBase;
+    pct = Math.min(pct, floorPct(baseRatio));
+  }
+  return { pct: Math.round(clamp(pct)), est, ratio, baseRatio, belowBase: baseRatio !== null && baseRatio < 1 };
 }
 
 // ── Knockouts (A4) ──────────────────────────────────────────────────────
@@ -279,7 +307,7 @@ export function computeScore(checklist, signals, profile) {
   const seniorityPct = seniorityScore(signals, profile);
   const domainPct = checklist.domain ? VERDICT_POINTS[checklist.domain.verdict] * 100 : null;
   const locationPct = locationScore(signals, signals.job || {}, profile);
-  const comp = compScore(signals, profile, signals.level?.level, signals.stage);
+  const comp = compScore(signals, profile, signals.level?.level, signals.stage, signals.job?.company);
 
   const components = {
     skills: { pct: skillsPct, weight: weights.skills },
@@ -315,6 +343,7 @@ export function computeScore(checklist, signals, profile) {
     .join(' ');
   if (knockouts.length > 0) breakdown += ` KO(${knockouts.length})`;
   if (comp.est) breakdown += ' est.';
+  if (comp.belowBase) breakdown += ' <base';
 
   return {
     fit,
@@ -329,6 +358,7 @@ export function computeScore(checklist, signals, profile) {
     capped,
     skillsCoverage: total > 0 ? { met: metCount, of: total } : null,
     compEstimate: comp.ratio !== null && comp.est ? { ratio: Math.round(comp.ratio * 100) / 100 } : null,
+    belowBase: comp.belowBase || false,
   };
 }
 
