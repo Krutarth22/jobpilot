@@ -50,8 +50,8 @@ flowchart LR
 
 | Step | What it does | What you get |
 |---|---|---|
-| ⚙️ **setup** | Reads your resume, works out the roles, seniority and locations that suit you, and asks you to confirm | Your profile, plus a list of companies to watch |
-| 🔍 **scan** | Checks the career pages of every company on your list (100+ to start with) | New jobs in your tracker, with the date posted and pay when listed. Reposted jobs are flagged, closed ones are marked closed, and you're told when your filters are too narrow |
+| ⚙️ **setup** | Reads your resume, works out the roles, seniority and locations that suit you, and asks you to confirm. Then it searches for companies hiring for those roles | Your profile, plus a list of companies to watch that fits your field, not just big tech |
+| 🔍 **scan** | Checks the career pages of every company on your list: 100+ to start with, plus companies it finds hiring for your target roles | New jobs in your tracker, with the date posted and pay when listed. Reposted jobs are flagged, closed ones are marked closed, and you're told when your filters are too narrow |
 | 📊 **match** | Reads each job post next to your profile and scores the fit from 0 to 100 | A score you can check line by line: which requirements you meet, with a quote from your profile for each one |
 | 🧐 **review** | Reads your profile the way that job's recruiter would | An **ATS score** out of 100 with what to fix, your strengths, honest gaps, rewritten bullet points, a check of which resume claims a recruiter could question, and an optional tailored resume PDF (with its new ATS score) |
 | 🤝 **contact** | Looks up the likely recruiter or hiring manager | Who they are, how sure it is, and a LinkedIn note under 300 characters |
@@ -106,7 +106,9 @@ This links the skills into your CLI's skills folder.
 /jobpilot:setup ~/Downloads/my-resume.pdf
 ```
 
-jobpilot reads your resume, suggests target roles and companies, and asks you to confirm them. That's the whole setup.
+jobpilot reads your resume, suggests target roles, and asks you to confirm them. Then it searches the job boards for companies hiring for those roles and adds them to your list. That's the whole setup.
+
+You don't need to name any companies. To find more later, ask: *"find more companies hiring for my roles"*.
 
 ### 3. Find jobs
 
@@ -300,6 +302,8 @@ No, and that's on purpose. Mass-applying gets ignored by recruiters and can get 
 <summary><b>The scan found nothing. What now?</b></summary>
 
 Your title filter is probably too narrow. Open `companies.yml` and add more wordings under `title_filter.positive`. Use `+` to require words in any order: `manager + engineering` matches both *"Engineering Manager"* and *"Manager, Software Engineering"*. Or ask jobpilot: *"broaden my scan filters"*.
+
+Or your company list doesn't include anyone hiring for your roles right now. Ask jobpilot to *"find more companies for my resume"*. It searches the job boards for your target titles and adds only companies with a matching opening.
 
 Every scan also lists **near misses**: job titles at your target locations that your filter skipped but that share words with the roles you want. It tells you exactly which wording to add, so you don't have to guess.
 </details>

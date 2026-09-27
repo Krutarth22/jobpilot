@@ -10,7 +10,7 @@ A small job-search pipeline. Five modes plus one-time setup:
 | Command | What it does |
 |---|---|
 | `/jobpilot:setup <resume.pdf\|docx>` | One-time: build the workspace from your resume |
-| `/jobpilot:scan` | Fetch new postings from your ATS boards (zero tokens) |
+| `/jobpilot:scan` | Fetch new postings from your ATS boards (zero tokens); "discover" finds more companies hiring for your target roles |
 | `/jobpilot:match` | Score unscored jobs 0–100 with a reason |
 | `/jobpilot:review <job>` | Recruiter's view of your profile for that job + optional tailored PDF |
 | `/jobpilot:contact <job>` | Find the hiring manager/recruiter, draft a ≤300-char LinkedIn note |

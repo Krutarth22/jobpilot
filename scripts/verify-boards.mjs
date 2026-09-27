@@ -124,7 +124,7 @@ export function removeEntries(text, deadKeys) {
 /** Write companies.yml via a text edit when it round-trips; fall back to a
  * full re-dump (which loses comments) only when the file isn't in the
  * one-entry-per-line style. */
-async function saveCompanies(file, text, edited, expected) {
+export async function saveCompanies(file, text, edited, expected) {
   const ok = edited !== null && (yaml.load(edited)?.companies || []).length === expected.length;
   await rename(file, `${file}.bak`);
   if (ok) {
@@ -137,7 +137,7 @@ async function saveCompanies(file, text, edited, expected) {
   }
 }
 
-async function mapPool(items, limit, fn) {
+export async function mapPool(items, limit, fn) {
   const results = new Array(items.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {

@@ -62,7 +62,9 @@ generates traces back to `profile.md` — build it carefully.
    - **Scan filters:** rewrite `title_filter` and `location_filter` in `companies.yml` from the confirmed targets. Companies word titles differently ("Engineering Manager" vs "Manager, Software Engineering"), so write word-order variants as AND-groups — `manager + engineering` matches both. Add `negative` terms for look-alikes the user doesn't want (e.g. `sales`, `recruiter`, `intern`).
    - **Company suggestions:** 5–15 companies in the user's domain, each with its ATS board (Greenhouse/Lever/Ashby). Verify each — `node "<pluginRoot>/scripts/verify-boards.mjs" --add "Name One" "Name Two"` probes slug variants across all three providers and appends only live boards; a board that 404s doesn't get saved.
 
-6. **Show a one-screen summary** — profile facts count, inferred targets, deal-breakers, company count — and ask the user to confirm or edit in one turn. Apply their edits, then tell them to run `/jobpilot:scan`.
+6. **Show a one-screen summary** — profile facts count, inferred targets, deal-breakers, company count — and ask the user to confirm or edit in one turn. Apply their edits.
+
+7. **Discover companies from the confirmed targets.** Follow "Discover" in the scan skill (`<pluginRoot>/skills/scan/SKILL.md`): queries from `discover.mjs --queries`, web search, then pipe the result URLs into `discover.mjs`. This adds companies hiring for the user's roles beyond the seed list — essential when their field isn't tech. Report what was added, then tell them to run `/jobpilot:scan`.
 
 ## Output contract
 
