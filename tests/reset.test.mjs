@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { reset, unsafeRoot } from '../scripts/reset.mjs';
@@ -48,4 +48,21 @@ test('reset: refuses home, filesystem root and folders holding the plugin', () =
   assert.match(unsafeRoot('/', { home: '/Users/x', plugin: '/opt/p' }), /home or root/);
   assert.match(unsafeRoot('/opt', { home: '/Users/x', plugin: '/opt/p' }), /plugin/);
   assert.equal(unsafeRoot('/Users/x/jobpilot', { home: '/Users/x', plugin: '/opt/p' }), null);
+});
+
+test('reset --wipe: deletes the workspace with no backup; dry-run deletes nothing', () => {
+  const { parent, root } = workspace();
+  const preview = reset(root, { wipe: true, dryRun: true, now: NOW });
+  assert.equal(preview.wiped, false);
+  assert.ok(existsSync(join(root, 'profile.md')));
+  const s = reset(root, { wipe: true, now: NOW });
+  assert.equal(s.wiped, true);
+  assert.equal(s.backup, null);
+  assert.equal(existsSync(root), false);
+  assert.deepEqual(readdirSync(parent), []);
+});
+
+test('reset --wipe: still refuses a home, root or plugin folder', () => {
+  const { root } = workspace();
+  assert.throws(() => reset(root, { wipe: true, home: root }), /refusing/);
 });

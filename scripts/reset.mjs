@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // jobpilot reset — start over from scratch without losing anything.
 //
-//   node reset.mjs [--dry-run]
+//   node reset.mjs [--dry-run]           move to a dated backup (undoable)
+//   node reset.mjs --wipe --yes          delete everything permanently (no backup)
 //
 // Moves the whole workspace (profile.md, companies.yml, jobs.csv, evals/,
 // out/, the original resume) to a dated sibling folder,
@@ -10,7 +11,7 @@
 // move the backup folder back. ~/.jobpilot.json is kept, so the workspace
 // path stays the same.
 
-import { existsSync, readdirSync, renameSync } from 'node:fs';
+import { existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, basename, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +33,7 @@ export function unsafeRoot(root, { home = homedir(), plugin = pluginRoot } = {})
   return null;
 }
 
-export function reset(root, { dryRun = false, now = new Date(), home, plugin } = {}) {
+export function reset(root, { dryRun = false, wipe = false, now = new Date(), home, plugin } = {}) {
   const abs = resolve(root);
   if (!existsSync(abs) || readdirSync(abs).length === 0) return { root: abs, backup: null, files: [], nothingToReset: true };
   const why = unsafeRoot(abs, { home, plugin });
@@ -41,13 +42,21 @@ export function reset(root, { dryRun = false, now = new Date(), home, plugin } =
   let backup = join(dirname(abs), `${basename(abs)}-backup-${stamp(now)}`);
   for (let i = 2; existsSync(backup); i++) backup = join(dirname(abs), `${basename(abs)}-backup-${stamp(now)}-${i}`);
   const resume = files.find((f) => /^resume\.(pdf|docx)$/i.test(f));
+  if (wipe) {
+    if (!dryRun) { rmSync(abs, { recursive: true, force: true }); }
+    return { root: abs, backup: null, files, wiped: !dryRun, dryRun };
+  }
   if (!dryRun) renameSync(abs, backup);
   return { root: abs, backup, files, resume: resume ? join(backup, resume) : null, dryRun };
 }
 
 if (isMainModule(import.meta.url)) {
   try {
-    const summary = reset(workspaceRoot(), { dryRun: process.argv.includes('--dry-run') });
+    const has = (f) => process.argv.includes(f);
+    if (has('--wipe') && !has('--yes') && !has('--dry-run')) {
+      throw new Error('--wipe deletes the workspace permanently, with no backup. Add --yes to confirm (or --dry-run to preview).');
+    }
+    const summary = reset(workspaceRoot(), { dryRun: has('--dry-run'), wipe: has('--wipe') });
     console.log(JSON.stringify(summary, null, 2));
   } catch (err) {
     console.error(`❌ ${err.message}`);
