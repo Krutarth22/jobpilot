@@ -30,7 +30,13 @@ generates traces back to `profile.md` — build it carefully.
 
 4. **Copy the original resume** into the workspace as `resume.<ext>` (keep the extension).
 
-5. **Extract the text**:
+5. **Capture the look of the resume** so tailored resumes mimic it (skip for DOCX/TXT/MD; they get the default look). Measure the PDF and render page 1:
+   ```sh
+   node "<pluginRoot>/scripts/extract-style.mjs" "<workspace>/resume.pdf" --preview="<workspace>/out/original-page1.png"
+   ```
+   It prints a measured `resume_style` (font, sizes in pt, ink/rule/divider colors, header alignment, section order, margin). Open the preview image and fill in what can't be measured: `family` (`serif`|`sans`), `bullet` (the character the resume uses), `contact` (which of email/phone/location/linkedin/github/website appear in the header, in order), and `icons` (true if they have small icons). Correct anything that looks wrong against the image. Store it as `resume_style` in the front matter in step 6. If the font isn't in `fonts/`, the closest system font of that `family` is used; tell the user.
+
+6a. **Extract the text**:
    ```sh
    node "<pluginRoot>/scripts/parse-resume.mjs" "<workspace>/resume.pdf"
    ```
@@ -50,6 +56,7 @@ generates traces back to `profile.md` — build it carefully.
      comp: { currency: USD, min_base: 250000, min_total: 350000 }   # multipliers come from step 9, never guessed
      deal_breakers: { onsite_only: false, needs_sponsorship: false, clearance: false }
      weights: { skills: 35, seniority: 25, domain: 15, location: 15, comp: 10 }
+     resume_style: { font: Merriweather, family: serif, weight: 300, sizes: { body: 8.9, name: 17.3, heading: 12.1, role: 10.5, contact: 7.9 }, ink: '#2e3c4f', rule: '#000000', divider: '#e2e7f0', header: center, contact: [email, phone, linkedin], icons: true, sections: [summary, experience, education, skills], bullet: '·', margin: 0.55 }   # from step 5
      experience:               # newest first; review's 30-second screen reads this
        - { title: Engineering Manager, company: Acme, start: 2019-03, end: present }
        - { title: Senior Engineer, company: Globex, start: 2015-06, end: 2019-02 }

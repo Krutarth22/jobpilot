@@ -24,6 +24,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import { profilePath } from './workspace.mjs';
+import { normalizeStyle } from './resume-style.mjs';
 
 /**
  * Split profile.md text into { frontmatter, body, hasFrontmatter }.
@@ -77,6 +78,8 @@ export function normalizeProfile(frontmatter = {}) {
     name: typeof frontmatter.name === 'string' ? frontmatter.name.trim() : '',
     paper: ['letter', 'a4'].includes(String(frontmatter.paper).toLowerCase()) ? String(frontmatter.paper).toLowerCase() : undefined,
     max_pages: Number(frontmatter.max_pages) > 0 ? Number(frontmatter.max_pages) : undefined,
+    // The look of the user's own resume, measured at setup (extract-style.mjs).
+    resume_style: normalizeStyle(frontmatter.resume_style),
     // Age penalty for the ranked list (lib/rank.mjs); missing → defaults.
     ranking: frontmatter.ranking && typeof frontmatter.ranking === 'object' ? frontmatter.ranking : {},
     // Links the resume itself points to (GitHub, personal site, LinkedIn, …).

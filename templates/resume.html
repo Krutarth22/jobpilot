@@ -2,87 +2,65 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>{{NAME}} — Resume</title>
-<style>
-  /* Single column, ATS-parseable: no tables for content, no columns, no icons. */
-  :root { --ink: #1a1a1a; --muted: #555; --accent: #1a4d7a; }
-  * { box-sizing: border-box; }
-  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.45; margin: 0; }
-  .page { max-width: 7.2in; margin: 0 auto; padding: 0.2in 0; }
-  header { text-align: left; border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 14px; }
-  h1 { font-size: 20pt; margin: 0 0 2px; letter-spacing: 0.5px; }
-  .contact { color: var(--muted); font-size: 9.5pt; }
-  .contact span { margin-right: 10px; }
-  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin: 16px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 2px; }
-  .role { margin-bottom: 10px; }
-  .role-head { display: flex; justify-content: space-between; align-items: baseline; }
-  .role-title { font-weight: 700; }
-  .role-meta { color: var(--muted); font-size: 9.5pt; white-space: nowrap; }
-  .role-org { font-weight: 600; color: var(--accent); }
-  ul { margin: 4px 0 0; padding-left: 16px; }
-  li { margin-bottom: 2px; }
-  .skills { display: block; }
-  .skills p { margin: 2px 0; }
-  .skills b { color: var(--muted); font-weight: 600; }
-  /* Keep a heading with what follows it, and a role in one piece, across page breaks. */
-  h2 { break-after: avoid; }
-  .role, li, header { break-inside: avoid; }
-  footer { margin-top: 18px; color: var(--muted); font-size: 8.5pt; }
-</style>
+<title>{{NAME}} - Resume</title>
+<!-- Structure only. Fonts, colors, sizes, header alignment, section order, bullets and
+     contact icons come from `resume_style` in profile.md (the look of the user's own
+     resume) and are added at render time. Do not add <style>, inline styles or new classes. -->
 </head>
 <body>
-<!-- Fill every double-brace placeholder. Delete a contact <span> the profile has no value for
-     (e.g. no GitHub link) — an unfilled placeholder stops the build. -->
+<!-- Fill every double-brace placeholder. Keep only the contact <span>s listed in
+     resume_style.contact, and delete one the profile has no value for. An unfilled
+     placeholder stops the build. Wrap numbers and named results in <b> only where the
+     user's own resume does. Section order is set by resume_style.sections; keep every
+     section the user's resume has, and omit one it doesn't. -->
 <div class="page">
 
   <header>
     <h1>{{NAME}}</h1>
     <div class="contact">
-      <span>{{EMAIL}}</span>
-      <span>{{PHONE}}</span>
-      <span>{{LOCATION}}</span>
-      <span>{{LINKEDIN}}</span>
-      <span>{{GITHUB}}</span>
-      <span>{{WEBSITE}}</span>
+      <span class="c-email">{{EMAIL}}</span>
+      <span class="c-phone">{{PHONE}}</span>
+      <span class="c-location">{{LOCATION}}</span>
+      <span class="c-linkedin">{{LINKEDIN}}</span>
+      <span class="c-github">{{GITHUB}}</span>
+      <span class="c-website">{{WEBSITE}}</span>
     </div>
   </header>
 
-  <section>
+  <section class="s-summary">
     <h2>Summary</h2>
     <p>{{SUMMARY}}</p>
   </section>
 
-  <section>
+  <section class="s-experience">
     <h2>Experience</h2>
     <!-- Repeat per role; keep the most role-relevant bullets first. -->
     <div class="role">
+      <div class="role-title">{{ROLE_TITLE}}</div>
       <div class="role-head">
-        <span class="role-title">{{ROLE_TITLE}}</span>
-        <span class="role-meta">{{DATES}}</span>
+        <span>{{COMPANY}}</span>
+        <span class="role-meta">{{DATES}}, {{ROLE_LOCATION}}</span>
       </div>
-      <div><span class="role-org">{{COMPANY}}</span> · {{ROLE_LOCATION}}</div>
       <ul>
         <li>{{BULLET}}</li>
       </ul>
     </div>
   </section>
 
-  <section>
-    <h2>Skills</h2>
-    <div class="skills">
-      <p><b>Languages & tools:</b> {{SKILLS_PRIMARY}}</p>
-      <p><b>Also:</b> {{SKILLS_SECONDARY}}</p>
+  <section class="s-education">
+    <h2>Education</h2>
+    <!-- Repeat per degree. -->
+    <div class="edu">
+      <div class="role-title">{{DEGREE}}</div>
+      <div>{{SCHOOL}} · {{SCHOOL_LOCATION}} · {{GRAD_YEAR}}</div>
     </div>
   </section>
 
-  <section>
-    <h2>Education</h2>
-    <div class="role">
-      <div class="role-head">
-        <span class="role-title">{{DEGREE}}</span>
-        <span class="role-meta">{{GRAD_YEAR}}</span>
-      </div>
-      <div><span class="role-org">{{SCHOOL}}</span></div>
+  <section class="s-skills">
+    <h2>Skills</h2>
+    <div class="skills">
+      <!-- One line per group, with the group names the user's resume uses. -->
+      <p><b>{{SKILL_GROUP}}:</b> {{SKILLS}}</p>
     </div>
   </section>
 

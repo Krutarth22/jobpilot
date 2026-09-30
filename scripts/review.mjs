@@ -245,7 +245,7 @@ export async function buildTailored(root, job, { profile, profileBody, jdText = 
   if (!factGate.ok) return { status: 1, error: 'fact gate failed — no PDF rendered', factGate, paths };
 
   await rm(paths.previewDir, { recursive: true, force: true }); // no stale pages
-  const render = await renderHtmlToPdf(html, paths.pdf, { format: paths.paper, previewDir: paths.previewDir });
+  const render = await renderHtmlToPdf(html, paths.pdf, { format: paths.paper, previewDir: paths.previewDir, style: profile.resume_style });
   const roundTrip = await atsRoundTrip(paths.pdf, paths.html);
   const ctx = { jdText, checklist, jobTitle: job.title, profile, profileBody };
   const original = originalResumePath(root);

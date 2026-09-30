@@ -93,10 +93,10 @@ test('render: counts pages and flags text running past the page edge', async () 
 test('build: a clean resume renders on Letter, named after the person, with previews', async () => {
   const html = readFileSync(new URL('../templates/resume.html', import.meta.url), 'utf8')
     .replace(/\{\{NAME\}\}/g, 'Jordan Rivera').replace('{{EMAIL}}', 'jordan@example.com').replace('{{PHONE}}', '+1 555 010 2233')
-    .replace('{{LOCATION}}', 'New York').replace(/\s*<span>\{\{(LINKEDIN|GITHUB|WEBSITE)\}\}<\/span>/g, '')
+    .replace('{{LOCATION}}', 'New York').replace(/\s*<span class="c-(linkedin|github|website)">\{\{[A-Z]+\}\}<\/span>/g, '')
     .replace('{{SUMMARY}}', 'Engineer at Acme Corp.').replace('{{ROLE_TITLE}}', 'Engineer').replace('{{DATES}}', '2019-2024')
     .replace('{{COMPANY}}', 'Acme Corp').replace('{{ROLE_LOCATION}}', 'New York').replace('{{BULLET}}', 'Built Python services at Acme Corp')
-    .replace('{{SKILLS_PRIMARY}}', 'Python').replace('{{SKILLS_SECONDARY}}', 'Python')
+    .replace('{{SKILL_GROUP}}', 'Languages').replace('{{SKILLS}}', 'Python').replace('{{SCHOOL_LOCATION}}', 'New York')
     .replace('{{DEGREE}}', 'B.S.').replace('{{GRAD_YEAR}}', '2019').replace('{{SCHOOL}}', 'State University');
   const { root, job, paths, profile } = workspace(html);
   writeFileSync(profilePath(root), '---\nname: Jordan Rivera\n---\nJordan Rivera, New York. Engineer at Acme Corp, 2019-2024. Built Python services at Acme Corp. B.S., State University, 2019.\n');
@@ -108,4 +108,51 @@ test('build: a clean resume renders on Letter, named after the person, with prev
   assert.ok(existsSync(paths.pdf));
   assert.ok(r.previews.length >= 1 && r.previews.every((p) => existsSync(p)));
   assert.equal(typeof r.atsScore.after, 'number');
+});
+
+import { normalizeStyle, styleCss, bundledFont, DEFAULT_STYLE } from '../scripts/lib/resume-style.mjs';
+import { extractStyle } from '../scripts/extract-style.mjs';
+import { normalizeProfile } from '../scripts/lib/profile.mjs';
+
+test('normalizeStyle: keeps valid fields, falls back per field, never throws', () => {
+  assert.deepEqual(normalizeStyle(undefined), DEFAULT_STYLE);
+  const s = normalizeStyle({ font: 'Lora"; x{', family: 'serif', ink: 'red', sizes: { body: 9, name: 999 }, header: 'center', contact: ['email', 'fax'], sections: ['Summary', 'Work History'], bullet: 'ab' });
+  assert.equal(s.font, 'Lora x');
+  assert.equal(s.family, 'serif');
+  assert.equal(s.ink, DEFAULT_STYLE.ink);
+  assert.equal(s.sizes.body, 9);
+  assert.equal(s.sizes.name, DEFAULT_STYLE.sizes.name);
+  assert.deepEqual(s.contact, ['email']);
+  assert.deepEqual(s.sections, ['summary', 'work-history']);
+  assert.equal(s.bullet, DEFAULT_STYLE.bullet);
+  assert.deepEqual(normalizeProfile({ resume_style: { header: 'center' } }).resume_style.header, 'center');
+});
+
+test('styleCss: order, header alignment, icons, and bundled font embedding', () => {
+  const css = styleCss({ font: 'Merriweather', family: 'serif', header: 'center', icons: true, contact: ['email'], sections: ['education', 'summary'] }, { format: 'letter' });
+  assert.match(css, /size: Letter/);
+  assert.match(css, /text-align: center/);
+  assert.match(css, /\.s-education \{ order: 1; \}/);
+  assert.match(css, /\.s-summary \{ order: 2; \}/);
+  assert.match(css, /\.c-email::before/);
+  assert.doesNotMatch(css, /\.c-phone::before/);
+  assert.match(css, /@font-face/);
+  assert.ok(bundledFont('Merriweather')[300]);
+  assert.doesNotMatch(styleCss({ font: 'Nonexistent Sans' }), /@font-face/);
+});
+
+test('extractStyle: reads the look from a real PDF', async () => {
+  const { resume_style, pages } = await extractStyle(new URL('./fixtures/sample-resume.pdf', import.meta.url).pathname);
+  assert.ok(pages >= 1);
+  assert.ok(resume_style.sizes.name >= resume_style.sizes.body);
+  assert.ok(['center', 'left'].includes(resume_style.header));
+});
+
+test('build: over the 2-page limit is reported as a problem (exit 3), the PDF is still written', async () => {
+  const bullets = '<li>Built Python services at Acme Corp</li>'.repeat(140);
+  const { root, job, paths, profile } = workspace(`<h1>Jordan Rivera</h1><p>Acme Corp</p><ul>${bullets}</ul>`);
+  const r = await buildTailored(root, job, { profile: { ...profile, max_pages: 2 }, profileBody: 'Built Python services at Acme Corp' });
+  assert.ok(r.pages > 2, `expected more than 2 pages, got ${r.pages}`);
+  assert.equal(r.status, 3);
+  assert.ok(r.problems.some((p) => /limit is 2/.test(p)));
 });

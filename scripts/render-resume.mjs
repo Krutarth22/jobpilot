@@ -3,7 +3,7 @@
 // Reduced from career-ops generate-pdf.mjs (MIT) to the ~50 lines a tailored
 // resume needs: ATS-safe text normalization + a clean print render.
 //
-//   node render-resume.mjs <input.html> <output.pdf> [--format=a4|letter] [--max-pages=N] [--preview=<dir>]
+//   node render-resume.mjs <input.html> <output.pdf> [--format=a4|letter] [--max-pages=N] [--preview=<dir>] [--style=<profile.md>]
 //
 // Exit 3: the PDF was written but is over the page limit or has text running
 // past the page edge — trim and render again.
@@ -15,6 +15,8 @@ import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { isMainModule } from './lib/main.mjs';
+import { parseProfile } from './lib/profile.mjs';
+import { normalizeStyle, styleCss } from './lib/resume-style.mjs';
 
 function normalizeTextForATS(html) {
   // Only touches body text — ATS parsers choke on typographic punctuation.
@@ -27,15 +29,15 @@ function normalizeTextForATS(html) {
     .replace(/\u00A0/g, ' ') + '<');
 }
 
-function injectPrintPageCss(html, format) {
-  const pageStyle = `<style>@page { size: ${format === 'letter' ? 'Letter' : 'A4'}; margin: 0.6in; }</style>`;
-  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${pageStyle}\n</head>`);
-  return `${pageStyle}\n${html}`;
+function injectStyle(html, css) {
+  const tag = `<style>\n${css}\n</style>`;
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${tag}\n</head>`);
+  return `${tag}\n${html}`;
 }
 
-// Printable width at 0.6in margins, in CSS px (96/in): content wider than
-// this runs off the page.
-const CONTENT_WIDTH_PX = { letter: Math.floor((8.5 - 1.2) * 96), a4: Math.floor((8.27 - 1.2) * 96) };
+// Printable width in CSS px (96/in): content wider than this runs off the page.
+const PAPER_WIDTH_IN = { letter: 8.5, a4: 8.27 };
+const contentWidthPx = (format, marginIn) => Math.floor((PAPER_WIDTH_IN[format] - 2 * marginIn) * 96);
 
 async function pdfPageCount(buffer) {
   const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
@@ -60,11 +62,13 @@ async function writePreviews(page, pdfPath, previewDir) {
  * Render HTML to PDF. Returns the page count and any text that runs past the
  * printable width (`overflow`), and — with `previewDir` — PNG previews.
  */
-export async function renderHtmlToPdf(html, outputPath, { format = 'a4', previewDir = null } = {}) {
+export async function renderHtmlToPdf(html, outputPath, { format = 'a4', previewDir = null, style = null } = {}) {
+  if (!PAPER_WIDTH_IN[format]) format = 'a4';
+  const look = normalizeStyle(style);
   const { chromium } = await import('playwright');
   const tmpHtmlPath = resolve(dirname(outputPath), `.jobpilot-render-${randomUUID()}.html`);
   await mkdir(dirname(outputPath), { recursive: true });
-  await writeFile(tmpHtmlPath, injectPrintPageCss(normalizeTextForATS(html), format), 'utf8');
+  await writeFile(tmpHtmlPath, injectStyle(normalizeTextForATS(html), styleCss(look, { format })), 'utf8');
 
   let browser;
   try {
@@ -72,7 +76,7 @@ export async function renderHtmlToPdf(html, outputPath, { format = 'a4', preview
     // The resume is static, untrusted-input-derived markup: no scripts, no network.
     const context = await browser.newContext({
       javaScriptEnabled: false,
-      viewport: { width: CONTENT_WIDTH_PX[format] || CONTENT_WIDTH_PX.a4, height: 1000 },
+      viewport: { width: contentWidthPx(format, look.margin), height: 1000 },
     });
     const page = await context.newPage();
     await page.route('**/*', (route) => {
@@ -117,14 +121,16 @@ if (isMainModule(import.meta.url)) {
   const positional = args.filter((a) => !a.startsWith('--'));
   const format = args.find((a) => a.startsWith('--format='))?.slice(9) || 'a4';
   const maxPages = Number(args.find((a) => a.startsWith('--max-pages='))?.slice(12)) || null;
+  const styleFrom = args.find((a) => a.startsWith('--style='))?.slice(8) || null;
   const previewDir = args.find((a) => a.startsWith('--preview='))?.slice(10) || null;
   const [inputPath, outputPath] = positional;
   if (!inputPath || !outputPath || !['a4', 'letter'].includes(format)) {
     console.error('Usage: node render-resume.mjs <input.html> <output.pdf> [--format=a4|letter] [--max-pages=N] [--preview=<dir>]');
     process.exit(1);
   }
-  readFile(resolve(inputPath), 'utf8')
-    .then((html) => renderHtmlToPdf(html, resolve(outputPath), { format, previewDir: previewDir && resolve(previewDir) }))
+  const styleFor = async () => (styleFrom ? parseProfile(await readFile(resolve(styleFrom), 'utf8')).frontmatter.resume_style : null);
+  Promise.all([readFile(resolve(inputPath), 'utf8'), styleFor()])
+    .then(([html, style]) => renderHtmlToPdf(html, resolve(outputPath), { format, style, previewDir: previewDir && resolve(previewDir) }))
     .then(({ outputPath: out, size, pages, overflow }) => {
       console.log(`✅ PDF generated: ${out} (${(size / 1024).toFixed(1)} KB, ${pages} page(s))`);
       for (const text of overflow) console.error(`⚠️  runs past the page edge: "${text}"`);
