@@ -10,7 +10,8 @@
 //   { "requirements": [
 //       { "text": "5+ years ML in production", "type": "must", "category": "skills",
 //         "verdict": "met", "evidence": "profile: 'Led ranking models at Acme 2019-2024'" } ],
-//     "domain": { "verdict": "partial", "evidence": "..." } }
+//     "domain": { "verdict": "partial", "evidence": "..." },
+//     "min_years": 5, "education": "bachelor", "certifications": ["PMP"] }   // the job's own asks, optional
 //
 // Verdicts: met | partial | missing. A "met" whose evidence doesn't quote
 // profile.md is DOWNGRADED to partial by code — a quote-less met is a claim,
@@ -104,7 +105,13 @@ export function validateChecklist(checklist, profileBody, profileSkills = []) {
       domain = { ...checklist.domain, verdict };
     }
   }
-  return { clean: { requirements, domain }, downgraded };
+  // Facts about the job itself, kept for the ATS score (lib/ats.mjs); unusable values are dropped.
+  const years = Number(checklist?.min_years);
+  const clean = { requirements, domain };
+  if (Number.isFinite(years) && years > 0 && years <= 40) clean.min_years = years;
+  if (['bachelor', 'master', 'phd'].includes(checklist?.education)) clean.education = checklist.education;
+  if (Array.isArray(checklist?.certifications)) clean.certifications = checklist.certifications.map(String).filter(Boolean).slice(0, 10);
+  return { clean, downgraded };
 }
 
 // ── Requirement traceability: every requirement must come from the JD ──

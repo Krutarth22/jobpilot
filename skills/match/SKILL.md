@@ -34,10 +34,12 @@ checklist, same score, every time.
    { "requirements": [
        { "text": "5+ years ML in production", "type": "must", "category": "skills",
          "verdict": "met", "evidence": "profile: 'Led ranking models at Acme 2019-2024'" } ],
-     "domain": { "verdict": "partial", "evidence": "..." } }
+     "domain": { "verdict": "partial", "evidence": "..." },
+     "min_years": 5, "education": "bachelor", "certifications": ["PMP"] }
    ```
    - `type` is `must` or `nice` (counts double vs single). `category` is `skills` for skill requirements.
    - `verdict` is `met`, `partial` or `missing`. **Every `met` must quote profile.md word for word, inside quotes, in `evidence`**: a span of 4+ words, or one skill exactly as the profile lists it. Paraphrases and partial quotes are downgraded to `partial` by code.
+   - `min_years`, `education` (`bachelor`, `master` or `phd`) and `certifications` are the job's own asks, copied from the posting: leave a field out when the posting doesn't say. The ATS score checks them against the resume. Don't record what the profile has, only what the job asks.
    - `domain` covers industry/product-area fit vs the profile's history and target titles.
    - Be honest — a `missing` is more useful than a generous `met`. Below ~40 total fit, tell the user you recommend not applying.
 5. Score it (deterministic; also validates evidence and applies knockouts):
@@ -49,7 +51,7 @@ checklist, same score, every time.
    - `untraced` — requirements whose wording can't be found in the job description (a tool it never names, or mostly words it doesn't use). Every requirement must come from the posting: paraphrase is fine, invention isn't. Drop or rewrite them from the page text.
 
    If `prescore` is `null`, the posting had too few recognizable terms for the keyword cross-check; `score.mjs` notes that on the row. The evidence rule and the requirement check still apply.
-7. When finished, show a ranked table: `#id · fit · breakdown · company · title · one-line reason` (use the breakdown, e.g. `S30/35 Sn20/25 D10/15 L15/15 C5/10`; `est.` means pay was estimated from base with a multiplier, `<base` means the posted base tops out under the user's `min_base`). Suggest `/jobpilot:review <id>` for the best 1–3.
+7. When finished, show a ranked table: `#id · fit · breakdown · company · title · one-line reason` (use the breakdown, e.g. `S30/35 Sn20/25 D10/15 L15/15 C5/10`; `est.` means pay was estimated from base with a multiplier, `<base` means the posted base tops out under the user's `min_base`). Suggest `/jobpilot:review <id>` for the best 1–3; review's ATS score reads this checklist (40 of its 100 points).
 8. **Close the learning loop** — early in the session, check whether any `applied` jobs are older than ~10 days and ask: "you applied to #12 two weeks ago — any update?" Record what the user says:
    ```sh
    node "<pluginRoot>/scripts/jobs.mjs" outcome <id> interview|rejected|offer|ghosted

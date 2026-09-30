@@ -53,7 +53,7 @@ flowchart LR
 | ⚙️ **setup** | Reads your resume, works out the roles, seniority and locations that suit you, and asks you to confirm. Then it searches for companies hiring for those roles | Your profile, plus a list of companies to watch that fits your field, not just big tech |
 | 🔍 **scan** | Checks the career pages of every company on your list: 100+ to start with, plus companies it finds hiring for your target roles | New jobs in your tracker, with the date posted and pay when listed. Reposted jobs are flagged, closed ones are marked closed, and you're told when your filters are too narrow |
 | 📊 **match** | Reads each job post next to your profile and scores the fit from 0 to 100 | A score you can check line by line: which requirements you meet, with a quote from your profile for each one |
-| 🧐 **review** | Reads your profile the way that job's recruiter would | An **ATS score** out of 100 with what to fix, your strengths, honest gaps, rewritten bullet points, a check of which resume claims a recruiter could question, and an optional tailored resume PDF (with its new ATS score) |
+| 🧐 **review** | Reads your profile the way that job's recruiter would | An **ATS score** out of 100 (job match plus readability) with every lost point explained, your strengths, honest gaps, rewritten bullet points, a check of which resume claims a recruiter could question, and an optional tailored resume PDF (with its new ATS score) |
 | 🤝 **contact** | Looks up the likely recruiter or hiring manager | Who they are, how sure it is, and a LinkedIn note under 300 characters |
 | 📝 **apply** | Opens the real application form in a browser and fills it in from your profile | A filled form, a screenshot, and a list of the fields it couldn't answer. **It stops before Submit.** |
 
@@ -181,21 +181,29 @@ You see the numbers before they're saved. A job whose base can't reach your mini
 <details>
 <summary><b>What is the ATS score?</b></summary>
 
-Most companies run resumes through an **applicant tracking system (ATS)**. It turns your file into text, and recruiters then search that text for keywords. The ATS score (0–100) shows how well your resume survives that for one specific job.
+Most companies run resumes through an **applicant tracking system (ATS)**. It turns your file into text, and recruiters then search that text. No ATS publishes a match number, so jobpilot scores your resume itself: an **ATS-readiness and job-match score** (0–100) for one specific job. It's an audit, not a simulation of any one ATS.
 
 | Part | Points | What it checks |
 |---|---|---|
-| Keywords | 50 | The job's must-have terms (30), its other terms (10), and the job title's wording (10) |
-| Readable | 30 | Real text rather than a scanned image, standard section headings, email and phone as plain text, no garbled characters |
-| Format | 20 | Two pages or fewer, a date range for every role, PDF or DOCX |
+| Job requirements | 40 | Every requirement from the job's checklist (made by **match**), must-haves counting more than nice-to-haves. Credit depends on whether your profile backs it and how well the resume *shows* it |
+| Skills and keywords | 25 | Must-have terms (15), nice-to-have terms (5), the job's vocabulary (5) |
+| Title and experience | 15 | Job title wording in your role titles, seniority, relevant years against what the job asks, and whether your latest role is relevant |
+| ATS parseability | 15 | Real text, standard headings, your employers recovered from the text, email and phone as plain text, newest role first, no garbled characters |
+| Hygiene | 5 | PDF or DOCX, date ranges, contact info, length (two pages or fewer), no oddities |
 
-You see it twice: once for your current resume, and again for the tailored version, for example **68 → 91**. Every lost point comes with a plain fix.
+**Proof beats a list.** A skill counts most when it appears in a role bullet with a result (a number), less in a summary, and least in a skills list. Tools you used long ago count less than ones you use now. Fundamentals like Python or SQL don't fade. Repeating a keyword never helps.
+
+**Ceilings.** If the job lists a must-have that your profile can't back, the score is capped however good the file is: 79 for one, 69 for two, 59 for three or more. Change the caps with `ats: { caps: [79, 69, 59] }` in your `profile.md`.
+
+**It needs `match`.** The requirements come from the checklist `match` saves for each job. Without one, that part is left out and the score says to run `match` first.
+
+You see the score twice: once for your current resume and again for the tailored version, for example **58 → 79**, with each part before and after. Every lost point comes with a plain finding, ranked **critical**, **high**, **medium** and **format**.
 
 Missing keywords are split into two lists:
 - **Safe to add:** your experience backs them, so they can go in.
 - **Gaps:** they're never added.
 
-Repeating a keyword doesn't raise the score, so keyword stuffing doesn't help.
+The tailored resume can only raise the score by showing what your profile already backs. It can't make you meet a requirement you don't.
 
 </details>
 
@@ -238,6 +246,8 @@ Want the folder somewhere else? Set `JOBPILOT_HOME=/path/you/like`.
 
 **Start over anytime** with `/jobpilot:reset`, for example for a new resume or a career change. Your current folder is moved to `~/jobpilot-backup-<date>` and setup runs again from scratch. Nothing is deleted, so you can always go back.
 
+**Wipe everything** by asking for a permanent wipe (`node scripts/reset.mjs --wipe --yes`). It deletes the whole folder with no backup, application history included, and setup starts again from a new resume. It always asks you first and can't be undone.
+
 ---
 
 ## FAQ
@@ -275,16 +285,17 @@ A copy of your resume rewritten for one job, using **only facts already in your 
 
 - **What changes:** the summary is aimed at the role, the most relevant bullets move to the top and are reworded in the job's language, and the skills the job asks for (that you have) come first.
 - **What never changes:** employers, titles, dates, degrees and numbers. Nothing new is added.
+- **The look stays yours.** At setup, jobpilot measures your own resume PDF (font, sizes, colors, centered or left-aligned header, section order, bullet style, contact icons) and saves it as `resume_style` in `profile.md`. Every tailored resume is drawn in that style, so it looks like the one you already send. Merriweather is bundled; for other fonts the closest system serif or sans is used. Add `<name>-300/400/700.woff2` files to `fonts/` to bundle more. A resume in a different style gives a different look.
 
 Before you see it, jobpilot checks it for you:
 
 1. **Fact check.** Any number, date, company or skill that isn't in your profile stops the PDF from being made.
-2. **Page check.** It fits on 1 page if you have under 10 years of experience, or 2 pages otherwise, and nothing runs off the edge.
+2. **Page check.** The PDF's real page count is checked. It must fit on 1 page if you have under 10 years of experience, or 2 pages otherwise (or your `max_pages`), and nothing may run off the edge. Over the limit, the least relevant bullets are cut and it's built again. The font is never shrunk to make it fit.
 3. **Paper size.** Letter in the US and Canada, A4 elsewhere.
-4. **ATS check.** The PDF is read back the way an applicant tracking system reads it, and scored. You see the score before and after, for example **67 → 91**.
+4. **ATS check.** The PDF is read back the way an applicant tracking system reads it, and scored. You see the score before and after, part by part, for example **58 → 79**.
 5. **A look at every page**, so nothing is cut off and no heading is left alone at the bottom of a page.
 
-The file is named after you (`Jordan-Rivera-Resume.pdf`), not the company, because recruiters see the file name and often forward it. You can set `paper: a4` or `max_pages: 2` in `profile.md` to change the defaults.
+The file is named after you (`Jordan-Rivera-Resume.pdf`), not the company, because recruiters see the file name and often forward it. Set `paper: a4` or `max_pages: 2` in `profile.md` to change the defaults.
 </details>
 
 <details>

@@ -218,6 +218,11 @@ export function originalResumePath(root) {
   return null;
 }
 
+/** The checklist `match` wrote for a job: scored files nest it, a bare one is the file itself. */
+export function checklistOf(evalFile) {
+  return evalFile?.checklist || (Array.isArray(evalFile?.requirements) ? evalFile : null);
+}
+
 async function scoreFile(file, ctx) {
   const { text, pages } = await extractDocument(file);
   return atsScore({ ...ctx, text, pages, fileName: file });
@@ -266,7 +271,17 @@ export async function buildTailored(root, job, { profile, profileBody, jdText = 
     problems,
     factGate: { ok: true, lint: factGate.lint, claimWarnings: factGate.claimWarnings },
     roundTrip,
-    atsScore: { before: atsBefore?.score ?? null, after: atsAfter.score, fixes: atsAfter.fixes, keywordsYouCanAdd: atsAfter.keywordsYouCanAdd },
+    atsScore: {
+      before: atsBefore?.score ?? null,
+      after: atsAfter.score,
+      cap: atsAfter.cap,
+      limited: atsAfter.limited,
+      // Each part, before → after, so the user sees what the tailoring moved.
+      breakdown: Object.fromEntries(Object.entries(atsAfter.parts).filter(([, p]) => p).map(([k, p]) => [k, { before: atsBefore?.parts[k]?.points ?? null, after: p.points, of: p.of }])),
+      findings: atsAfter.findings,
+      fixes: atsAfter.fixes,
+      keywordsYouCanAdd: atsAfter.keywordsYouCanAdd,
+    },
     notes: paths.notes,
   };
 }
@@ -295,7 +310,7 @@ async function main(argv) {
     }
     let jdText = '';
     try { jdText = await fetchDescription(root, job); } catch { /* keywords part of the ATS score is skipped */ }
-    const result = await buildTailored(root, job, { profile, profileBody, jdText, checklist: readEval(root, job.id)?.checklist });
+    const result = await buildTailored(root, job, { profile, profileBody, jdText, checklist: checklistOf(readEval(root, job.id)) });
     const { status, ...report } = result;
     console.log(JSON.stringify(report, null, 2));
     process.exit(status);
@@ -311,7 +326,7 @@ async function main(argv) {
     const { profile, body: profileBody } = loadProfile(root);
     let jdText = '';
     try { jdText = await fetchDescription(root, job); } catch { /* keywords part is skipped without it */ }
-    const result = await scoreFile(target, { jdText, checklist: readEval(root, job.id)?.checklist, jobTitle: job.title, profile, profileBody });
+    const result = await scoreFile(target, { jdText, checklist: checklistOf(readEval(root, job.id)), jobTitle: job.title, profile, profileBody });
     console.log(JSON.stringify(result, null, 2));
     return;
   }
@@ -325,7 +340,7 @@ async function main(argv) {
   if (!job) { console.error(`no job matching "${id}" in jobs.csv`); process.exit(1); }
   const { profile, body: profileBody } = loadProfile(root);
   const evalFile = readEval(root, job.id);
-  const checklist = evalFile?.checklist;
+  const checklist = checklistOf(evalFile);
   const resumeArg = rest.indexOf('--resume') !== -1 ? rest[rest.indexOf('--resume') + 1] : null;
 
   let jdText = '';
@@ -363,6 +378,8 @@ async function main(argv) {
     screen,
     ats,
     atsScore: atsScores,
+    // No checklist = the requirements part (40 points) can't be scored; run match for this job first.
+    needsMatch: !checklist,
     note: 'must-have % comes from the match checklist; screen checks are code over profile.md + resume; "recognizable" and prose verdicts are the review skill\'s AI',
   };
   console.log(JSON.stringify(scorecard, null, 2));

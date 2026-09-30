@@ -1,6 +1,6 @@
 {
   "name": "jobpilot",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A small job-search copilot: setup from one resume, zero-token ATS scanning (Greenhouse/Lever/Ashby), fit scoring, recruiter-view review, contact drafts, apply-with-review.",
   "author": {
     "name": "Krutarth22",
