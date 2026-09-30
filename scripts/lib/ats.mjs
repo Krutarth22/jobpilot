@@ -39,7 +39,9 @@ const STANDARD = ['experience', 'education', 'skills'];
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+/;
 const PHONE = /(?:\+?\d[\d\s().-]{8,}\d)/;
 const MONTHS = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?';
-const RANGE_SRC = `(?:(${MONTHS})\\s+)?(?:\\d{1,2}/)?((?:19|20)\\d{2})\\s*(?:[-–—]|to)\\s*(?:(?:(${MONTHS})\\s+)?(?:\\d{1,2}/)?((?:19|20)\\d{2})|(present|current|now))`;
+// Groups: 1 start month name, 2 start month number, 3 start year, 4 end month name,
+// 5 end month number, 6 end year, 7 present/current/now.
+const RANGE_SRC = `(?:(${MONTHS})\\s+|(\\d{1,2})/)?((?:19|20)\\d{2})\\s*(?:[-–—]|to)\\s*(?:(?:(${MONTHS})\\s+|(\\d{1,2})/)?((?:19|20)\\d{2})|(present|current|now))`;
 const MONTH_INDEX = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 const TITLE_STOP = new Set(['and', 'the', 'for', 'of', 'with', 'sr', 'jr', 'senior', 'junior', 'staff', 'principal', 'lead', 'ii', 'iii', 'iv']);
 const BULLET_MARK = /^\s*[•·\-–*▪◦]\s?/;
@@ -65,17 +67,18 @@ export function titleWords(title) {
 
 // ── Reading the resume text ─────────────────────────────────────────────
 
-function dateOf(month, year, end) {
-  const m = month ? MONTH_INDEX[month.slice(0, 3).toLowerCase()] : (end ? 11 : 0);
-  return new Date(Number(year), m ?? 0, 1);
+function dateOf(monthName, monthNum, year, end) {
+  let m;
+  if (monthName) m = MONTH_INDEX[monthName.slice(0, 3).toLowerCase()];
+  else if (monthNum && Number(monthNum) >= 1 && Number(monthNum) <= 12) m = Number(monthNum) - 1;
+  return new Date(Number(year), m ?? (end ? 11 : 0), 1);
 }
 
 function parseRange(line) {
   const m = line.match(new RegExp(RANGE_SRC, 'i'));
   if (!m) return null;
-  const start = dateOf(m[1], m[2], false);
-  const ongoing = Boolean(m[5]);
-  return { start, end: ongoing ? null : dateOf(m[3], m[4], true), ongoing };
+  const ongoing = Boolean(m[7]);
+  return { start: dateOf(m[1], m[2], m[3], false), end: ongoing ? null : dateOf(m[4], m[5], m[6], true), ongoing };
 }
 
 /** Sections, and one record per dated role: header (title/company lines) and body. */
@@ -180,7 +183,8 @@ function contentWords(text) {
 // ── Scoring ────────────────────────────────────────────────────────────
 
 function component(weight, subs) {
-  const live = subs.filter((s) => s.of > 0);
+  // Every sub-score is held to its own maximum, so no part can push the total past 100.
+  const live = subs.filter((s) => s.of > 0).map((s) => ({ ...s, got: Math.max(0, Math.min(s.got, s.of)) }));
   const possible = live.reduce((a, s) => a + s.of, 0);
   if (possible === 0) return null;
   const earned = live.reduce((a, s) => a + s.got, 0);
@@ -283,7 +287,7 @@ export function atsScore({
   const skillsPart = allJd.length === 0 ? null : component(25, [
     { name: 'mustHaveTerms', got: must.length ? 15 * Math.min(1, mean(must)) : 0, of: must.length ? 15 : 0 },
     { name: 'niceTerms', got: niceTerms.length ? 5 * Math.min(1, mean(niceTerms)) : 0, of: niceTerms.length ? 5 : 0 },
-    { name: 'jobVocabulary', got: 5 * (allJd.filter((k) => evidence(k) > 0).length / Math.min(allJd.length, TERM_CAP)), of: 5 },
+    { name: 'jobVocabulary', got: 5 * Math.min(1, allJd.filter((k) => evidence(k) > 0).length / Math.min(allJd.length, TERM_CAP)), of: 5 },
   ]);
   const backed = new Set([...skillsOf.map((s) => String(canonicalize(s)).toLowerCase()), ...extractTerms(profileBody, skillsOf)].map((s) => String(s).toLowerCase()));
   const missingAll = [...new Set([...must, ...niceTerms])].filter((k) => evidence(k) === 0);

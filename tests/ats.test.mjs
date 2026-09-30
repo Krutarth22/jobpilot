@@ -159,3 +159,37 @@ test('originalResumePath: finds the resume setup saved in the workspace', () => 
   writeFileSync(join(root, 'resume.docx'), '');
   assert.equal(originalResumePath(root), join(root, 'resume.docx'));
 });
+
+import { readResume } from '../scripts/lib/ats.mjs';
+
+test('ats: no part can exceed its points, however many job terms the resume covers', () => {
+  const terms = ['Python', 'Go', 'Rust', 'Java', 'Kotlin', 'Scala', 'Ruby', 'Swift', 'Docker', 'Kubernetes', 'Terraform', 'Ansible', 'Jenkins', 'Datadog', 'Prometheus', 'Grafana', 'Kafka', 'Spark', 'Airflow', 'Snowflake', 'Redis', 'Postgres', 'MySQL', 'MongoDB', 'React', 'Django'];
+  const list = terms.join(', ');
+  const text = `Alex Morgan\nalex@example.com +1 555 010 2233\nSummary\nEngineer.\nExperience\nEngineer - Acme    Mar 2021 - Present\n• Built services in ${list} with 40% gains\n${'Delivered reliable systems for customers every quarter. '.repeat(10)}\nSkills\n${list}\nEducation\nB.S. State University 2016`;
+  const r = atsScore({
+    text, pages: 1, fileName: 'a.pdf', jdText: `Experience with ${list}.`, jobTitle: 'Engineer', now: NOW,
+    checklist: { requirements: [met(`Experience with ${list}`)] }, profile: { skills: terms.map((t) => t.toLowerCase()) }, profileBody: '',
+  });
+  for (const p of Object.values(r.parts)) assert.ok(p.points <= p.of, `${p.points}/${p.of}`);
+  assert.ok(r.raw <= 100 && r.score <= 100, `score ${r.score}`);
+});
+
+test('readResume: numeric months are read as months, not thrown away', () => {
+  const doc = readResume('Experience\nEngineer\nAcme  12/2024 - 01/2025\n• Built things\nEngineer\nBeta  03/2020 - present');
+  assert.equal(doc.roles.length, 2);
+  const [a, b] = doc.roles;
+  assert.deepEqual([a.start.getFullYear(), a.start.getMonth()], [2024, 11]);
+  assert.deepEqual([a.end.getFullYear(), a.end.getMonth()], [2025, 0]);
+  assert.deepEqual([b.start.getFullYear(), b.start.getMonth()], [2020, 2]);
+  assert.equal(b.end, null);
+  // and name-based months, and year-only ranges, still work
+  const named = readResume('Experience\nEngineer\nAcme  Sep 2019 - Mar 2021\nEngineer\nBeta  2015 - 2018').roles;
+  assert.deepEqual([named[0].start.getMonth(), named[0].end.getMonth()], [8, 2]);
+  assert.deepEqual([named[1].start.getMonth(), named[1].end.getMonth()], [0, 11]);
+});
+
+test('ats: one month of relevant experience counts as one month', () => {
+  const short = GOOD.replace(/Mar 2021 – Present/, '12/2024 – 01/2025').replace(/Jun 2016 – Feb 2021/, '');
+  const yearsPart = run(short, { now: NOW }).parts.experience.subs.find((s) => s.name === 'relevantYears');
+  assert.ok(yearsPart.got < 1, `relevantYears ${yearsPart.got}/4`);
+});
